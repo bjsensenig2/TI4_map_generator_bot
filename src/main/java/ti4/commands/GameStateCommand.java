@@ -8,8 +8,8 @@ public abstract class GameStateCommand implements Command {
 
     private final CommandGameStateHelper commandGameStateHelper;
 
-    public GameStateCommand(boolean loadGame, boolean saveGame, boolean isPlayerCommand) {
-        commandGameStateHelper = new CommandGameStateHelper(loadGame, saveGame, isPlayerCommand);
+    public GameStateCommand(boolean saveGame, boolean isPlayerCommand) {
+        commandGameStateHelper = new CommandGameStateHelper(saveGame, isPlayerCommand);
     }
 
     @Override

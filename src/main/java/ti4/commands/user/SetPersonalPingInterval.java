@@ -13,8 +13,10 @@ import ti4.buttons.Buttons;
 import ti4.commands.Subcommand;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.message.MessageHelper;
+import ti4.users.UserSettings;
+import ti4.users.UserSettingsManager;
 
-public class SetPersonalPingInterval extends Subcommand {
+class SetPersonalPingInterval extends Subcommand {
 
     // OFFER PING INTERVAL BUTTONS
     private static final String OFFER_PING_OPTIONS = "playerPref_personalPingInterval";
@@ -30,7 +32,7 @@ public class SetPersonalPingInterval extends Subcommand {
     @Override
     public void execute(SlashCommandInteractionEvent event) {
         int pingInterval = event.getOption("hours", 0, OptionMapping::getAsInt);
-        var userSettings = UserSettingsManager.getInstance().getUserSettings(event.getUser().getId());
+        var userSettings = UserSettingsManager.get(event.getUser().getId());
         set(event, userSettings, pingInterval);
     }
 

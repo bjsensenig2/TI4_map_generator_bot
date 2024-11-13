@@ -14,7 +14,7 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import ti4.AsyncTI4DiscordBot;
-import ti4.commands.Command;
+import ti4.commands.ParentCommand;
 import ti4.helpers.Constants;
 import ti4.map.Game;
 import ti4.map.GameManager;
@@ -96,14 +96,13 @@ public class SlashCommandListener extends ListenerAdapter {
             }, BotLogger::catchRestError);
         }
 
-        CommandManager commandManager = CommandManager.getInstance();
-        for (Command command : CommandManager.getCommands()) {
+        for (ParentCommand command : AsyncTI4DiscordBot.commands) {
             if (command.accept(event)) {
                 try {
                     command.execute(event);
                     command.postExecute(event);
                 } catch (Exception e) {
-                    String messageText = "Error trying to execute command: " + command.getActionID();
+                    String messageText = "Error trying to execute command: " + command.getName();
                     String errorMessage = ExceptionUtils.getMessage(e);
                     event.getHook().editOriginal(errorMessage).queue();
                     BotLogger.log(event, messageText, e);
@@ -139,7 +138,6 @@ public class SlashCommandListener extends ListenerAdapter {
 
     public static boolean setActiveGame(MessageChannel channel, String userID, String eventName, String subCommandName) {
         String channelName = channel.getName();
-        GameManager gameManager = GameManager;
         Game userActiveGame = GameManager.getUserActiveGame(userID);
         List<String> mapList = GameManager.getGameNames();
 

@@ -1,4 +1,4 @@
-package ti4.commands.user;
+package ti4.users;
 
 import java.io.File;
 import java.io.IOException;

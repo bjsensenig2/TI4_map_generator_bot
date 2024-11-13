@@ -11,8 +11,9 @@ import ti4.generator.Mapper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Helper;
 import ti4.message.MessageHelper;
+import ti4.users.UserSettingsManager;
 
-public class SetPreferredColourList extends Subcommand {
+class SetPreferredColourList extends Subcommand {
 
     public SetPreferredColourList() {
         super("set_preferred_colours", "Set your preferred colour list");
@@ -30,7 +31,7 @@ public class SetPreferredColourList extends Subcommand {
             }
         }
         colourList.removeAll(badColours);
-        var userSettings = UserSettingsManager.getInstance().getUserSettings(event.getUser().getId());
+        var userSettings = UserSettingsManager.get(event.getUser().getId());
         userSettings.setPreferredColourList(colourList);
         StringBuilder sb = new StringBuilder();
         sb.append("Preferred Colour List updated to: `").append(colourList).append("`");
