@@ -1993,7 +1993,7 @@ public class ButtonHelper {
                 target.setTacticalCC(target.getTacticalCC() + 1);
             }
             target.setTacticalCC(target.getTacticalCC() - 1);
-            AddCC.addCC(event, target.getColor(), tile);
+            CommandCounterHelper.addCC(event, target.getColor(), tile);
 
         }
 
@@ -2033,7 +2033,7 @@ public class ButtonHelper {
                 target.setTacticalCC(target.getTacticalCC() + 1);
             }
             target.setTacticalCC(target.getTacticalCC() - 1);
-            AddCC.addCC(event, target.getColor(), tile);
+            CommandCounterHelper.addCC(event, target.getColor(), tile);
         }
         MessageHelper.sendMessageToChannel(mahact.getCorrectChannel(),
             mahact.getRepresentationUnfogged() + " you have spent a strategy CC");
@@ -2082,7 +2082,7 @@ public class ButtonHelper {
                     target.setTacticalCC(target.getTacticalCC() + 1);
                 }
                 target.setTacticalCC(target.getTacticalCC() - 1);
-                AddCC.addCC(event, target.getColor(), tile);
+                CommandCounterHelper.addCC(event, target.getColor(), tile);
             }
         }
         MessageHelper.sendMessageToChannel(minister.getCorrectChannel(), minister.getRepresentationUnfogged() + " you have used the Minister of Peace agenda");
@@ -3933,7 +3933,7 @@ public class ButtonHelper {
             int cc = player.getTacticalCC();
             cc -= 1;
             player.setTacticalCC(cc);
-            AddCC.addCC(event, player.getColor(), tile, true);
+            CommandCounterHelper.addCC(event, player.getColor(), tile, true);
         }
         String thingToAdd = "box";
         for (String unit : displacedUnits.keySet()) {
@@ -6315,11 +6315,11 @@ public class ButtonHelper {
                 return;
             }
             Tile tile = game.getTileByPosition(planet);
-            AddCC.addCC(event, color2, tile);
+            CommandCounterHelper.addCC(event, color2, tile);
             Helper.isCCCountCorrect(event, game, color2);
             for (String color : mahactP.getMahactCC()) {
                 if (Mapper.isValidColor(color) && !color.equalsIgnoreCase(player.getColor())) {
-                    AddCC.addCC(event, color, tile);
+                    CommandCounterHelper.addCC(event, color, tile);
                     Helper.isCCCountCorrect(event, game, color);
                 }
             }

@@ -1614,9 +1614,8 @@ public class MapGenerator implements AutoCloseable {
                 }
 
                 int numInReinforcements = unitCap - count;
-                BufferedImage image = ImageHelper.read(getUnitPath(unitKey));
-                BufferedImage decal = null;
-                decal = ImageHelper.read(ResourceHelper.getInstance().getDecalFile(player.getDecalFile(unitID)));
+                BufferedImage image = ImageHelper.read(TileHelper.getUnitPath(unitKey, allEyesOnMe));
+                BufferedImage decal = ImageHelper.read(ResourceHelper.getInstance().getDecalFile(player.getDecalFile(unitID)));
                 for (int i = 0; i < numInReinforcements; i++) {
                     Point position = reinforcementsPosition.getPosition(unitID);
                     graphics.drawImage(image, x + position.x, y + position.y, null);
@@ -1800,7 +1799,7 @@ public class MapGenerator implements AutoCloseable {
                 Player p = game.getPlayerFromColorOrFaction(unitKey.getColor());
 
                 try {
-                    String unitPath = getUnitPath(unitKey);
+                    String unitPath = TileHelper.getUnitPath(unitKey, allEyesOnMe);
                     if (unitPath != null) {
                         if (unitKey.getUnitType() == UnitType.Fighter) {
                             unitPath = unitPath.replace(Constants.COLOR_FF, Constants.BULK_FF);
@@ -2554,14 +2553,9 @@ public class MapGenerator implements AutoCloseable {
         }
     }
 
-    private String getUnitPath(UnitKey unit) {
-        ResourceHelper rs = ResourceHelper.getInstance();
-        return allEyesOnMe ? rs.getUnitFile(unit, allEyesOnMe) : rs.getUnitFile(unit);
-    }
-
     private void drawPAUnitUpgrade(int x, int y, UnitKey unitKey) {
         try {
-            String path = getUnitPath(unitKey);
+            String path = TileHelper.getUnitPath(unitKey, allEyesOnMe);
             BufferedImage img = ImageHelper.read(path);
             graphics.drawImage(img, x, y, null);
         } catch (Exception e) {

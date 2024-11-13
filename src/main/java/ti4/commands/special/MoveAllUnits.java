@@ -4,11 +4,11 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import ti4.commands.tokens.AddCC;
 import ti4.commands.uncategorized.ShowGame;
 import ti4.commands.units.AddRemoveUnits;
 import ti4.commands.units.MoveUnits;
 import ti4.helpers.AliasHandler;
+import ti4.helpers.CommandCounterHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.DisplayType;
 import ti4.helpers.Helper;
@@ -81,7 +81,7 @@ public class MoveAllUnits extends SpecialSubcommandData {
                 MoveUnits.removeTacticsCC(event, player.getColor(), tile2, game);
             }
             if (!"no".equals(value)) {
-                AddCC.addCC(event, player.getColor(), tile2, false);
+                CommandCounterHelper.addCC(event, player.getColor(), tile2, false);
             }
             Helper.isCCCountCorrect(event, game, player.getColor());
         }

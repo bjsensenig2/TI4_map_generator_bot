@@ -21,7 +21,6 @@ import ti4.commands.cardsso.SOInfo;
 import ti4.commands.explore.ExploreFrontier;
 import ti4.commands.leaders.CommanderUnlockCheck;
 import ti4.commands.special.NaaluCommander;
-import ti4.commands.tokens.AddCC;
 import ti4.commands.tokens.RemoveCC;
 import ti4.commands.units.AddUnits;
 import ti4.commands.units.MoveUnits;
@@ -798,7 +797,8 @@ public class ButtonHelperActionCards {
     @ButtonHandler("probeStep2_")
     public static void resolveProbeStep2(Player player, Game game, ButtonInteractionEvent event, String buttonID) {
         Tile tile = game.getTileByPosition(buttonID.split("_")[1]);
-        new ExploreFrontier().expFront(event, tile, game, player);
+        new ExploreFrontier();
+        ExploreFrontier.expFront(event, tile, game, player);
         ButtonHelper.deleteMessage(event);
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
             player.getFactionEmoji() + " explored the frontier token in " + tile.getRepresentation());
@@ -1237,7 +1237,7 @@ public class ButtonHelperActionCards {
         Player p2 = game.getPlayerFromColorOrFaction(buttonID.split("_")[1]);
         String pos = buttonID.split("_")[2];
         Tile tile = game.getTileByPosition(pos);
-        AddCC.addCC(event, p2.getColor(), tile);
+        CommandCounterHelper.addCC(event, p2.getColor(), tile);
         ButtonHelper.deleteMessage(event);
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
             player.getRepresentationUnfogged() + " you signal jammed the tile: "

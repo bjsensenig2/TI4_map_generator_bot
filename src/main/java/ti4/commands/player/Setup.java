@@ -26,6 +26,7 @@ import ti4.commands.uncategorized.CardsInfo;
 import ti4.commands.units.AddRemoveUnits;
 import ti4.generator.Mapper;
 import ti4.generator.PositionMapper;
+import ti4.generator.TileHelper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.ButtonHelperAbilities;
@@ -378,7 +379,7 @@ public class Setup extends PlayerSubcommandData {
                 unit = AliasHandler.resolveUnit(unitInfoTokenizer.nextToken());
             }
             UnitKey unitID = Mapper.getUnitKey(unit, color);
-            String unitPath = Tile.getUnitPath(unitID);
+            String unitPath = TileHelper.getUnitPath(unitID, false);
             if (unitPath == null) {
                 MessageHelper.sendMessageToChannel(event.getMessageChannel(),
                     "Unit: " + unit + " is not valid and not supported.");
@@ -387,7 +388,7 @@ public class Setup extends PlayerSubcommandData {
             if (unitInfoTokenizer.hasMoreTokens()) {
                 planetName = AliasHandler.resolvePlanet(unitInfoTokenizer.nextToken());
             }
-            planetName = AddRemoveUnits.getPlanet(event, tile, planetName);
+            planetName = AddRemoveUnits.getPlanet(tile, planetName);
             tile.addUnit(planetName, unitID, count);
         }
     }

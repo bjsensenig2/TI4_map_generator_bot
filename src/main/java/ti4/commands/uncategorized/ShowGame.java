@@ -9,21 +9,22 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import ti4.buttons.Buttons;
-import ti4.commands.ParentCommand;
+import ti4.commands.GameStateCommand;
 import ti4.generator.MapRenderPipeline;
 import ti4.helpers.Constants;
 import ti4.helpers.DisplayType;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.map.Game;
-import ti4.map.GameManager;
 import ti4.message.MessageHelper;
 
-public class ShowGame implements ParentCommand {
+public class ShowGame extends GameStateCommand {
+
+    public ShowGame() {
+        super(false, false);
+    }
 
     @Override
     public String getName() {
@@ -31,15 +32,22 @@ public class ShowGame implements ParentCommand {
     }
 
     @Override
+    public String getDescription() {
+        return "Show selected map";
+    }
+
+    @Override
+    public List<OptionData> getOptions() {
+        return List.of(
+                new OptionData(OptionType.STRING, Constants.LONG_PN_DISPLAY, "Long promissory display, y or yes to show full promissory text")
+                        .setRequired(false),
+                new OptionData(OptionType.BOOLEAN, Constants.DM_CARD_INFO, "Set TRUE to get card info as direct message also")
+                        .setRequired(false));
+    }
+
+    @Override
     public void execute(SlashCommandInteractionEvent event) {
-        Game game;
-        OptionMapping option = event.getOption(Constants.GAME_NAME);
-        if (option != null) {
-            String gameName = option.getAsString().toLowerCase();
-            game = GameManager.getGame(gameName);
-        } else {
-            game = getGame();
-        }
+        Game game = getGame();
         DisplayType displayType = null;
         OptionMapping statsOption = event.getOption(Constants.DISPLAY_TYPE);
         if (statsOption != null) {
@@ -117,15 +125,5 @@ public class ShowGame implements ParentCommand {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), "Map Image sent to " + game.getBotMapUpdatesThread().getJumpUrl());
         }
         return channel;
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
-        commands.addCommands(
-            Commands.slash(getName(), "Shows selected map")
-                .addOptions(new OptionData(OptionType.STRING, Constants.GAME_NAME, "Map name to be shown").setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.DISPLAY_TYPE, "Show map in specific format. all, map, stats").setAutoComplete(true)));
     }
 }

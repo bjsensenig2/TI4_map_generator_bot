@@ -2,6 +2,7 @@ package ti4.commands.units;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -10,17 +11,17 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import org.apache.commons.lang3.StringUtils;
 import ti4.ResourceHelper;
-import ti4.commands.tokens.AddCC;
 import ti4.generator.Mapper;
 import ti4.generator.PositionMapper;
+import ti4.generator.TileHelper;
 import ti4.helpers.AliasHandler;
+import ti4.helpers.CommandCounterHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.Helper;
+import ti4.helpers.UnitParser;
 import ti4.helpers.Units.UnitKey;
 import ti4.map.Game;
 import ti4.map.Player;
@@ -33,6 +34,27 @@ public class MoveUnits extends AddRemoveUnits {
     private boolean toAction;
     private Map<UnitKey, Integer> unitsDamage = new HashMap<>();
     private boolean priorityDmg = true;
+
+    @Override
+    public List<OptionData> getOptions() {
+        return List.of(
+                new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile to move units from")
+                        .setRequired(true)
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri")
+                        .setRequired(true),
+                new OptionData(OptionType.STRING, Constants.TILE_NAME_TO, "System/Tile to move units to")
+                        .setAutoComplete(true)
+                        .setRequired(true),
+                new OptionData(OptionType.STRING, Constants.UNIT_NAMES_TO, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri")
+                        .setRequired(true),
+                new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit")
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.CC_USE, "Type t or tactics to add a CC from tactics, r or retreat to add a CC without taking it from tactics")
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.PRIORITY_NO_DAMAGE, "Priority for not damaged units. Type in yes or y"),
+                new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command"));
+    }
 
     @Override
     protected void unitParsingForTile(SlashCommandInteractionEvent event, String color, Tile tile, Game game) {
@@ -48,7 +70,7 @@ public class MoveUnits extends AddRemoveUnits {
         }
 
         String unitList = event.getOption(Constants.UNIT_NAMES).getAsString().toLowerCase();
-        unitParsing(event, color, tile, unitList, game);
+        UnitParser.unitParsing(event, color, tile, unitList, game);
 
         String tileID;
         String tileOption = event.getOption(Constants.TILE_NAME_TO, null, OptionMapping::getAsString);
@@ -58,7 +80,7 @@ public class MoveUnits extends AddRemoveUnits {
         } else { //USE TILE_FROM
             tileID = tile.getTileID();
         }
-        tile = getTile(event, tileID, game);
+        tile = TileHelper.getTile(event, tileID, game);
 
         if (tile == null) {
             MessageHelper.sendMessageToChannel(event.getChannel(), "Tile: " + tileID + " not found. Please try a different name or just use position coordinate");
@@ -98,7 +120,7 @@ public class MoveUnits extends AddRemoveUnits {
             case "0", "none" -> {
                 //Do nothing, as no unit was moved to
             }
-            default -> unitParsing(event, color, tile, unitList, game);
+            default -> UnitParser.unitParsing(event, color, tile, unitList, game);
         }
 
         OptionMapping optionCC = event.getOption(Constants.CC_USE);
@@ -118,10 +140,10 @@ public class MoveUnits extends AddRemoveUnits {
             removeTacticsCC(event, color, tile, game);
         }
 
-        AddCC.addCC(event, color, tile, false);
+        CommandCounterHelper.addCC(event, color, tile, false);
         Helper.isCCCountCorrect(event, game, color);
         for (UnitHolder unitHolder_ : tile.getUnitHolders().values()) {
-            addPlanetToPlayArea(event, tile, unitHolder_.getName(), game);
+            addPlanetToPlayArea(event, tile, unitHolder_.getName());
         }
     }
 
@@ -212,7 +234,7 @@ public class MoveUnits extends AddRemoveUnits {
                 if (cc == 0) {
                     MessageHelper.sendMessageToChannel(event.getChannel(), "You don't have CC in Tactics");
                     break;
-                } else if (!AddCC.hasCC(event, color, tile)) {
+                } else if (!CommandCounterHelper.hasCC(event, color, tile)) {
                     cc -= 1;
                     player.setTacticalCC(cc);
                     break;
@@ -315,22 +337,4 @@ public class MoveUnits extends AddRemoveUnits {
         return Constants.MOVE_UNITS;
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
-        commands.addCommands(
-            Commands.slash(getName(), this.getDescription())
-                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile to move units from").setRequired(true).setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri").setRequired(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME_TO, "System/Tile to move units to")
-                    .setAutoComplete(true).setRequired(true))
-                .addOptions(
-                    new OptionData(OptionType.STRING, Constants.UNIT_NAMES_TO, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri").setRequired(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit").setAutoComplete(true))
-                .addOptions(
-                    new OptionData(OptionType.STRING, Constants.CC_USE, "Type t or tactics to add a CC from tactics, r or retreat to add a CC without taking it from tactics").setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.PRIORITY_NO_DAMAGE, "Priority for not damaged units. Type in yes or y"))
-                .addOptions(new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command")));
-    }
 }

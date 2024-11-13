@@ -21,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import ti4.buttons.Buttons;
 import ti4.commands.cardsac.ACInfo;
 import ti4.commands.cardspn.PlayPN;
-import ti4.commands.combat.StartCombat;
 import ti4.commands.game.StartPhase;
 import ti4.commands.leaders.CommanderUnlockCheck;
 import ti4.commands.leaders.RefreshLeader;
@@ -190,7 +189,7 @@ public class ButtonHelperFactionSpecific {
         Player p2 = game.getPlayerFromColorOrFaction(buttonID.split("_")[1]);
         String pos = buttonID.split("_")[2];
         Tile tile = game.getTileByPosition(pos);
-        AddCC.addCC(event, p2.getColor(), tile);
+        CommandCounterHelper.addCC(event, p2.getColor(), tile);
         event.getMessage().delete().queue();
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
             player.getRepresentationUnfogged() + " you placed " + p2.getFactionEmojiOrColor()
@@ -424,7 +423,7 @@ public class ButtonHelperFactionSpecific {
             && !game.playerHasLeaderUnlockedOrAlliance(player, "rohdhnacommander")) {
             String color = player.getColor();
             if (Mapper.isValidColor(color)) {
-                AddCC.addCC(event, color, tile);
+                CommandCounterHelper.addCC(event, color, tile);
             }
             ButtonHelper.sendMessageToRightStratThread(player, game,
                 player.getFactionEmoji() + " Placed 1 CC from reinforcements in the "
@@ -468,7 +467,7 @@ public class ButtonHelperFactionSpecific {
         Player p2 = game.getPlayerFromColorOrFaction(buttonID.split("_")[1]);
         String pos = buttonID.split("_")[2];
         Tile tile = game.getTileByPosition(pos);
-        AddCC.addCC(event, p2.getColor(), tile);
+        CommandCounterHelper.addCC(event, p2.getColor(), tile);
         event.getMessage().delete().queue();
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
             player.getRepresentationUnfogged() + " you stymied the tile: "
@@ -635,7 +634,7 @@ public class ButtonHelperFactionSpecific {
     @ButtonHandler("spyNetPlayerChooses")
     public static void resolveSpyNetPlayerChooses(Player player, Game game, ButtonInteractionEvent event) {
         Player yssaril = findPNOwner("spynet", game);
-        MessageHelper.sendMessageToChannelWithButtons(player.getCardsInfoThread(), "Use Buttons to take 1 AC", ACInfo.getToBeStolenActionCardButtons(game, yssaril));
+        MessageHelper.sendMessageToChannelWithButtons(player.getCardsInfoThread(), "Use Buttons to take 1 AC", ActionCardHelper.getToBeStolenActionCardButtons(game, yssaril));
         event.getMessage().delete().queue();
     }
 
@@ -764,14 +763,14 @@ public class ButtonHelperFactionSpecific {
     @ButtonHandler("tnelisDeploy_")
     public static void tnelisDeploy(Player player, Game game, ButtonInteractionEvent event, String buttonID) {
         String planet = buttonID.split("_")[1];
-        new AddUnits().unitParsing(event, player.getColor(), game.getTileFromPlanet(planet),
+        UnitParser.unitParsing(event, player.getColor(), game.getTileFromPlanet(planet),
             "1 mech " + planet, game);
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
             player.getFactionEmoji() + " landed 1 mech on "
                 + Helper.getPlanetRepresentation(planet, game) + " using Tnelis mech deploy ability");
         List<Player> players = ButtonHelper.getPlayersWithUnitsOnAPlanet(game, game.getTileFromPlanet(planet), planet);
         if (players.size() > 1) {
-            StartCombat.startGroundCombat(players.get(0), players.get(1), game, event,
+            CombatHelper.startGroundCombat(players.get(0), players.get(1), game, event,
                 ButtonHelper.getUnitHolderFromPlanetName(planet, game), game.getTileFromPlanet(planet));
         }
         List<Button> options = ButtonHelper.getExhaustButtonsWithTG(game, player, "res");
@@ -783,7 +782,7 @@ public class ButtonHelperFactionSpecific {
     @ButtonHandler("raghsCallStepOne_")
     public static void resolveRaghsCallStepOne(Player player, Game game, ButtonInteractionEvent event, String buttonID) {
         String origPlanet = buttonID.split("_")[1];
-        PlayPN.resolvePNPlay("ragh", player, game, event);
+        PromissoryNoteHelper.resolvePNPlay("ragh", player, game, event);
         List<Button> buttons = new ArrayList<>();
         Player saar = game.getPNOwner("ragh");
         for (String planet : saar.getPlanetsAllianceMode()) {
@@ -1928,7 +1927,7 @@ public class ButtonHelperFactionSpecific {
     public static List<Button> getButtonsToTakeSomeonesAC(Game game, Player thief, Player victim) {
         List<Button> takeACs = new ArrayList<>();
         String secretScoreMsg = "_ _\nClick a button to take 1 Action Card";
-        List<Button> acButtons = ACInfo.getToBeStolenActionCardButtons(game, victim);
+        List<Button> acButtons = ActionCardHelper.getToBeStolenActionCardButtons(game, victim);
         if (!acButtons.isEmpty()) {
             List<MessageCreateData> messageList = MessageHelper.getMessageCreateDataObjects(secretScoreMsg, acButtons);
             ThreadChannel cardsInfoThreadChannel = thief.getCardsInfoThread();

@@ -8,6 +8,7 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.apache.commons.lang3.StringUtils;
 import ti4.buttons.Buttons;
+import ti4.commands.Subcommand;
 import ti4.commands.leaders.CommanderUnlockCheck;
 import ti4.commands.player.TurnStart;
 import ti4.generator.Mapper;
@@ -27,7 +28,8 @@ import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
 import ti4.model.TechnologyModel;
 
-public class GetTechButton extends TechSubcommandData {
+public class GetTechButton extends Subcommand {
+
     public GetTechButton() {
         super(Constants.BUTTON, "Force the add tech button to display");
     }

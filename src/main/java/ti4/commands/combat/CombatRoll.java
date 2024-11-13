@@ -102,13 +102,6 @@ class CombatRoll extends GameStateSubcommand {
         return rollType;
     }
 
-    public boolean checkIfUnitsOfType(Player player, Game game, GenericInteractionCreateEvent event, Tile tile, String unitHolderName, CombatRollType rollType) {
-        UnitHolder combatOnHolder = tile.getUnitHolders().get(unitHolderName);
-        Map<UnitModel, Integer> playerUnitsByQuantity = CombatHelper.GetUnitsInCombat(tile, combatOnHolder, player, event,
-            rollType, game);
-        return !playerUnitsByQuantity.isEmpty();
-    }
-
     public static int secondHalfOfCombatRoll(Player player, Game game, GenericInteractionCreateEvent event, Tile tile, String unitHolderName, CombatRollType rollType) {
         return secondHalfOfCombatRoll(player, game, event, tile, unitHolderName, rollType, false);
     }

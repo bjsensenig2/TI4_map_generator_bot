@@ -35,7 +35,6 @@ import ti4.helpers.Helper;
 import ti4.helpers.ImageHelper;
 import ti4.helpers.Storage;
 import ti4.helpers.Units;
-import ti4.helpers.Units.UnitKey;
 import ti4.map.Game;
 import ti4.map.Planet;
 import ti4.map.Player;
@@ -1583,11 +1582,6 @@ public class TileGenerator {
         }
     }
 
-    private String getUnitPath(UnitKey unit) {
-        ResourceHelper rs = ResourceHelper.getInstance();
-        return allEyesOnMe ? rs.getUnitFile(unit, allEyesOnMe) : rs.getUnitFile(unit);
-    }
-
     private void addUnits(Tile tile, Graphics tileGraphics, List<Rectangle> rectangles, int degree, int degreeChange, UnitHolder unitHolder, int radius, Player fowPlayer) {
         BufferedImage unitImage;
         Map<Units.UnitKey, Integer> tempUnits = new HashMap<>(unitHolder.getUnits());
@@ -1666,7 +1660,7 @@ public class TileGenerator {
             };
 
             try {
-                String unitPath = getUnitPath(unitKey);
+                String unitPath = TileHelper.getUnitPath(unitKey, allEyesOnMe);
                 if (unitPath != null) {
                     if (unitKey.getUnitType() == Units.UnitType.Fighter) {
                         unitPath = unitPath.replace(Constants.COLOR_FF, Constants.BULK_FF);

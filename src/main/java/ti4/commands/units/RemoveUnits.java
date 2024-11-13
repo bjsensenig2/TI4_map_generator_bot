@@ -1,5 +1,6 @@
 package ti4.commands.units;
 
+import java.util.List;
 import java.util.Objects;
 
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
@@ -7,9 +8,7 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import ti4.helpers.Constants;
 import ti4.helpers.Units.UnitKey;
 import ti4.map.Game;
@@ -104,7 +103,7 @@ public class RemoveUnits extends AddRemoveUnits {
             }
         }
         for (UnitHolder unitHolder_ : tile.getUnitHolders().values()) {
-            addPlanetToPlayArea(event, tile, unitHolder_.getName(), game);
+            addPlanetToPlayArea(event, tile, unitHolder_.getName());
         }
     }
 
@@ -114,28 +113,29 @@ public class RemoveUnits extends AddRemoveUnits {
     }
 
     @Override
-    protected void actionAfterAll(SlashCommandInteractionEvent event, Tile tile, String color, Game game) {
-        super.actionAfterAll(event, tile, color, game);
-        for (UnitHolder unitHolder_ : tile.getUnitHolders().values()) {
-            addPlanetToPlayArea(event, tile, unitHolder_.getName(), game);
-        }
-    }
-
-    @Override
     public String getDescription() {
         return "Remove units from map";
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
-    public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
-        commands.addCommands(
-            Commands.slash(getName(), getDescription())
-                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name").setRequired(true).setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri").setRequired(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit").setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.PRIORITY_NO_DAMAGE, "Priority for not damaged units. Type in yes or y"))
-                .addOptions(new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command")));
+    protected void actionAfterAll(SlashCommandInteractionEvent event, Tile tile, String color, Game game) {
+        super.actionAfterAll(event, tile, color, game);
+        for (UnitHolder unitHolder_ : tile.getUnitHolders().values()) {
+            addPlanetToPlayArea(event, tile, unitHolder_.getName());
+        }
+    }
+
+    @Override
+    public List<OptionData> getOptions() {
+        return List.of(
+                new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name")
+                        .setRequired(true)
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri")
+                        .setRequired(true),
+                new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit")
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.PRIORITY_NO_DAMAGE, "Priority for not damaged units. Type in yes or y"),
+                new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command"));
     }
 }

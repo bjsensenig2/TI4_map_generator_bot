@@ -28,6 +28,7 @@ import ti4.helpers.ButtonHelperAgents;
 import ti4.helpers.ButtonHelperFactionSpecific;
 import ti4.helpers.ButtonHelperHeroes;
 import ti4.helpers.CombatTempModHelper;
+import ti4.helpers.CommandCounterHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.Emojis;
 import ti4.helpers.FoWHelper;
@@ -327,7 +328,7 @@ public class HeroPlay extends LeaderAction {
             case "vaylerianhero" -> {
                 if (!game.isNaaluAgent()) {
                     player.setTacticalCC(player.getTacticalCC() - 1);
-                    AddCC.addCC(event, player.getColor(), game.getTileByPosition(game.getActiveSystem()));
+                    CommandCounterHelper.addCC(event, player.getColor(), game.getTileByPosition(game.getActiveSystem()));
                     game.setStoredValue("vaylerianHeroActive", "true");
                 }
                 List<Button> removeCCs = ButtonHelper.getButtonsToRemoveYourCC(player, game, event, "vaylerianhero");

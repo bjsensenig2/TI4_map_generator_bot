@@ -12,6 +12,7 @@ import ti4.map.Player;
 import ti4.message.MessageHelper;
 
 public class TechAdd extends TechAddRemove {
+
     public TechAdd() {
         super(Constants.TECH_ADD, "Add Tech");
     }

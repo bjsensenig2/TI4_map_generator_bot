@@ -7,33 +7,37 @@ import java.util.StringTokenizer;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
-import ti4.commands.CommandHelper;
-import ti4.commands.ParentCommand;
-import ti4.commands.uncategorized.ShowGame;
+import ti4.commands.GameStateCommand;
 import ti4.generator.Mapper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Constants;
 import ti4.helpers.Helper;
 import ti4.map.Game;
-import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
 import ti4.map.Tile;
-import ti4.map.UserGameContextManager;
 import ti4.message.MessageHelper;
 
-abstract public class AddRemoveToken implements ParentCommand {
+abstract public class AddRemoveToken extends GameStateCommand {
+
+    public AddRemoveToken() {
+        super(true, true);
+    }
+
+    @Override
+    public List<OptionData> getOptions() {
+        return List.of(
+                new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name")
+                        .setRequired(true)
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.PLANET, "Planet name")
+                        .setAutoComplete(true),
+                new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color")
+                        .setAutoComplete(true));
+    }
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String userID = event.getUser().getId();
-        if (!UserGameContextManager.doesUserHaveContextGame(userID)) {
-            MessageHelper.replyToMessage(event, "Set your active game using: /set_game gameName");
-            return;
-        }
-
         String tileOptions = event.getOption(Constants.TILE_NAME, null, OptionMapping::getAsString);
         if (tileOptions == null) {
             MessageHelper.replyToMessage(event, "Tile needs to be specified.");
@@ -42,7 +46,7 @@ abstract public class AddRemoveToken implements ParentCommand {
 
         OptionMapping factionOrColour = event.getOption(Constants.FACTION_COLOR);
         List<String> colors = new ArrayList<>();
-        Game game = CommandHelper.getGameName(event);
+        Game game = getGame();
         if (factionOrColour != null) {
             String colorString = factionOrColour.getAsString().toLowerCase();
             colorString = colorString.replace(" ", "");
@@ -58,14 +62,8 @@ abstract public class AddRemoveToken implements ParentCommand {
                 }
             }
         } else {
-            Player player = game.getPlayer(userID);
-            player = Helper.getGamePlayer(game, player, event, null);
-            if (player == null) {
-                MessageHelper.sendMessageToChannel(event.getChannel(), "Player could not be found");
-                return;
-            }
+            Player player = getPlayer();
             colors.add(player.getColor());
-
         }
 
         List<Tile> tiles = new ArrayList<>();
@@ -92,21 +90,7 @@ abstract public class AddRemoveToken implements ParentCommand {
         for (Tile tile : tiles) {
             parsingForTile(event, colors, tile, game);
         }
-        GameSaveLoadManager.saveGame(game, event);
-        ShowGame.simpleShowGame(game, event);
     }
 
     abstract void parsingForTile(SlashCommandInteractionEvent event, List<String> color, Tile tile, Game game);
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
-        commands.addCommands(Commands.slash(getName(), getDescription())
-                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name").setRequired(true).setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.PLANET, "Planet name").setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color").setAutoComplete(true)));
-    }
-
-    abstract public String getDescription();
 }

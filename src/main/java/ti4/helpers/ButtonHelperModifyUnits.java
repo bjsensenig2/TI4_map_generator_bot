@@ -158,8 +158,10 @@ public class ButtonHelperModifyUnits {
         UnitHolder unitHolder = ButtonHelper.getUnitHolderFromPlanetName(planet, game);
         int count = 0;
         while (haveGroundForces) {
-            int hitP1 = new CombatRoll().secondHalfOfCombatRoll(p1, game, event, tile, planet, CombatRollType.combatround, true);
-            int hitP2 = new CombatRoll().secondHalfOfCombatRoll(p2, game, event, tile, planet, CombatRollType.combatround, true);
+            new CombatRoll();
+            int hitP1 = CombatRoll.secondHalfOfCombatRoll(p1, game, event, tile, planet, CombatRollType.combatround, true);
+            new CombatRoll();
+            int hitP2 = CombatRoll.secondHalfOfCombatRoll(p2, game, event, tile, planet, CombatRollType.combatround, true);
 
             if (p1.hasTech("vpw") && hitP2 > 0) {
                 hitP1++;
@@ -1174,7 +1176,7 @@ public class ButtonHelperModifyUnits {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), player.getFactionEmoji()
                 + " did not place a CC in the retreat system due to Kado S'mah-Qar, the Kollecc commander.");
         } else {
-            AddCC.addCC(event, player.getColor(), tile2, true);
+            CommandCounterHelper.addCC(event, player.getColor(), tile2, true);
         }
 
         for (Map.Entry<String, UnitHolder> entry : tile1.getUnitHolders().entrySet()) {
@@ -1437,7 +1439,7 @@ public class ButtonHelperModifyUnits {
                         + Helper.getPlanetRepresentation(planetName, game) + " system";
                     if (!game.playerHasLeaderUnlockedOrAlliance(player, "rohdhnacommander")) {
                         if (Mapper.isValidColor(color)) {
-                            AddCC.addCC(event, color, tile);
+                            CommandCounterHelper.addCC(event, color, tile);
                         }
                     } else {
                         msg = playerRep

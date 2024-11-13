@@ -40,9 +40,6 @@ public class Cleanup extends GameStateSubcommand {
         }
         Game game = getGame();
         runStatusCleanup(game);
-
-        int prevRound = game.getRound() - 1;
-        StatusCommand.reply(event, "End of round " + prevRound + " status phase.");
     }
 
     public void runStatusCleanup(Game game) {

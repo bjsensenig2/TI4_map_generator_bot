@@ -1,12 +1,12 @@
 package ti4.commands.uncategorized;
 
+import java.util.List;
+
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import ti4.commands.CommandHelper;
-import ti4.commands.ParentCommand;
+import ti4.commands.GameStateCommand;
 import ti4.commands.cardsac.ACInfo;
 import ti4.commands.cardspn.PNInfo;
 import ti4.commands.cardsso.SOInfo;
@@ -20,10 +20,22 @@ import ti4.helpers.Constants;
 import ti4.helpers.Helper;
 import ti4.map.Game;
 import ti4.map.Player;
-import ti4.map.UserGameContextManager;
 import ti4.message.MessageHelper;
 
-public class AllInfo implements ParentCommand {
+public class AllInfo extends GameStateCommand {
+
+    public AllInfo() {
+        super(true, true);
+    }
+
+    @Override
+    public List<OptionData> getOptions() {
+        return List.of(
+                new OptionData(OptionType.STRING, Constants.LONG_PN_DISPLAY, "Long promissory display, y or yes to show full promissory text")
+                        .setRequired(false),
+                new OptionData(OptionType.BOOLEAN, Constants.DM_CARD_INFO, "Set TRUE to get card info as direct message also")
+                        .setRequired(false));
+    }
 
     @Override
     public String getName() {
@@ -37,33 +49,21 @@ public class AllInfo implements ParentCommand {
 
     @Override
     public boolean accept(SlashCommandInteractionEvent event) {
-        return ParentCommand.super.accept(event) &&
+        return super.accept(event) &&
                 CommandHelper.acceptIfPlayerInGame(event);
     }
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String userID = event.getUser().getId();
-        Game game;
-        if (!UserGameContextManager.doesUserHaveContextGame(userID)) {
-            MessageHelper.replyToMessage(event, "Set your active game using: /set_game gameName");
+        Game game = getGame();
+        String color = Helper.getColor(game, event);
+        if (!Mapper.isValidColor(color)) {
+            MessageHelper.replyToMessage(event, "Color/Faction not valid");
             return;
-        } else {
-            game = CommandHelper.getGameName(event);
-            String color = Helper.getColor(game, event);
-            if (!Mapper.isValidColor(color)) {
-                MessageHelper.replyToMessage(event, "Color/Faction not valid");
-                return;
-            }
         }
 
-        Player player = game.getPlayer(userID);
-        player = Helper.getGamePlayer(game, player, event, null);
-        if (player == null) {
-            MessageHelper.sendMessageToChannel(event.getChannel(), "Player could not be found");
-            return;
-        }
-        String headerText = player.getRepresentation() + CardsInfoHelper.getHeaderText(event) + "`";
+        Player player = getPlayer();
+        String headerText = player.getRepresentation() + CommandHelper.getHeaderText(event) + "`";
         MessageHelper.sendMessageToPlayerCardsInfoThread(player, game, headerText);
         AbilityInfo.sendAbilityInfo(game, player);
         UnitInfo.sendUnitInfo(game, player, false);
@@ -75,15 +75,4 @@ public class AllInfo implements ParentCommand {
         PNInfo.sendPromissoryNoteInfo(game, player, false);
         CardsInfo.sendVariousAdditionalButtons(game, player);
     }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
-        commands.addCommands(
-            Commands.slash(getName(), getDescription())
-                .addOptions(new OptionData(OptionType.STRING, Constants.LONG_PN_DISPLAY, "Long promissory display, y or yes to show full promissory text").setRequired(false))
-                .addOptions(new OptionData(OptionType.BOOLEAN, Constants.DM_CARD_INFO, "Set TRUE to get card info as direct message also").setRequired(false)));
-    }
-
 }

@@ -60,7 +60,7 @@ class ExplorePlanet extends GameStateSubcommand {
             MessageHelper.sendMessageToEventChannel(event, "System not found that contains planet");
             return;
         }
-        planetName = AddRemoveUnits.getPlanet(event, tile, AliasHandler.resolvePlanet(planetName));
+        planetName = AddRemoveUnits.getPlanet(tile, AliasHandler.resolvePlanet(planetName));
         PlanetModel planet = Mapper.getPlanet(planetName);
         if (Optional.ofNullable(planet).isEmpty()) {
             MessageHelper.sendMessageToEventChannel(event, "Invalid planet");

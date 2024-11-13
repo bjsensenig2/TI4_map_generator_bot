@@ -8,6 +8,7 @@ import ti4.map.Game;
 import ti4.map.Tile;
 
 public class RemoveUnitDamage extends AddRemoveUnits {
+
     @Override
     protected void unitAction(SlashCommandInteractionEvent event, Tile tile, int count, String planetName, UnitKey unitID, String color, Game game) {
         tile.removeUnitDamage(planetName, unitID, count);

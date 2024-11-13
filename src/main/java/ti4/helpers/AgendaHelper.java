@@ -53,7 +53,6 @@ import ti4.commands.special.SwordsToPlowsharesTGGain;
 import ti4.commands.special.WormholeResearchFor;
 import ti4.commands.status.RevealStage1;
 import ti4.commands.status.RevealStage2;
-import ti4.commands.tokens.AddCC;
 import ti4.commands.units.AddUnits;
 import ti4.generator.MapGenerator;
 import ti4.generator.Mapper;
@@ -234,7 +233,7 @@ public class AgendaHelper {
                         for (Tile tile : ButtonHelper.getAllWormholeTiles(game)) {
                             for (Player player : game.getRealPlayers()) {
                                 if (FoWHelper.playerHasShipsInSystem(player, tile)) {
-                                    AddCC.addCC(event, player.getColor(), tile);
+                                    CommandCounterHelper.addCC(event, player.getColor(), tile);
                                 }
                             }
                         }
@@ -276,7 +275,7 @@ public class AgendaHelper {
                         for (Player player : game.getRealPlayers()) {
                             Tile tile = player.getHomeSystemTile();
                             if (tile != null) {
-                                AddCC.addCC(event, player.getColor(), tile);
+                                CommandCounterHelper.addCC(event, player.getColor(), tile);
                             }
                         }
                         MessageHelper.sendMessageToChannel(game.getMainGameChannel(),

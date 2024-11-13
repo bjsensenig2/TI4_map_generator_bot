@@ -7,13 +7,10 @@ import java.util.List;
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import ti4.buttons.Buttons;
-import ti4.commands.CommandHelper;
-import ti4.commands.ParentCommand;
+import ti4.commands.GameStateCommand;
 import ti4.commands.uncategorized.ShowGame;
 import ti4.generator.Mapper;
 import ti4.helpers.Constants;
@@ -21,14 +18,29 @@ import ti4.map.Game;
 import ti4.map.GameSaveLoadManager;
 import ti4.map.Tile;
 import ti4.map.UnitHolder;
-import ti4.map.UserGameContextManager;
 import ti4.message.MessageHelper;
 
-public class AddFrontierTokens implements ParentCommand {
+public class AddFrontierTokens extends GameStateCommand {
+
+    public AddFrontierTokens() {
+        super(true, false);
+    }
 
     @Override
     public String getName() {
         return Constants.ADD_FRONTIER_TOKENS;
+    }
+
+    @Override
+    public String getDescription() {
+        return "Add frontier tokens.";
+    }
+
+    @Override
+    public List<OptionData> getOptions() {
+        return List.of(
+                new OptionData(OptionType.STRING, Constants.CONFIRM, "Type YES to confirm")
+                        .setRequired(true));
     }
 
     public static void parsingForTile(GenericInteractionCreateEvent event, Game game) {
@@ -54,26 +66,9 @@ public class AddFrontierTokens implements ParentCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String userID = event.getUser().getId();
-        if (!UserGameContextManager.doesUserHaveContextGame(userID)) {
-            MessageHelper.replyToMessage(event, "Set your active game using: /set_game gameName");
-        } else {
-            Game game = CommandHelper.getGameName(event);
-            parsingForTile(event, game);
-            GameSaveLoadManager.saveGame(game, event);
-            ShowGame.simpleShowGame(game, event);
-        }
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
-        commands.addCommands(
-            Commands.slash(getName(), "Add Frontier tokens to all possible tiles")
-                .addOptions(new OptionData(OptionType.STRING, Constants.CONFIRM, "Type YES to confirm")
-                    .setRequired(true))
-
-        );
+        Game game = getGame();
+        parsingForTile(event, game);
+        GameSaveLoadManager.saveGame(game, event);
+        ShowGame.simpleShowGame(game, event);
     }
 }

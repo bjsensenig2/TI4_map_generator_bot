@@ -100,7 +100,7 @@ public class AddToken extends AddRemoveToken {
         StringTokenizer planetTokenizer = new StringTokenizer(unitHolder, ",");
         while (planetTokenizer.hasMoreTokens()) {
             String planet = planetTokenizer.nextToken();
-            planet = AddRemoveUnits.getPlanet(event, tile, AliasHandler.resolvePlanet(planet));
+            planet = AddRemoveUnits.getPlanet(tile, AliasHandler.resolvePlanet(planet));
             if (!tile.isSpaceHolderValid(planet)) {
                 MessageHelper.sendMessageToChannel(channel, "Planet: " + planet + " is not valid and not supported.");
                 continue;

@@ -4,7 +4,7 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import ti4.map.Game;
 import ti4.map.Player;
 
-public abstract class GameStateCommand implements Command {
+public abstract class GameStateCommand implements ParentCommand {
 
     private final CommandGameStateHelper commandGameStateHelper;
 
@@ -14,13 +14,13 @@ public abstract class GameStateCommand implements Command {
 
     @Override
     public void preExecute(SlashCommandInteractionEvent event) {
-        Command.super.preExecute(event);
+        ParentCommand.super.preExecute(event);
         commandGameStateHelper.preExecute(event);
     }
 
     @Override
     public void postExecute(SlashCommandInteractionEvent event) {
-        Command.super.postExecute(event);
+        ParentCommand.super.postExecute(event);
         commandGameStateHelper.postExecute(event);
     }
 
