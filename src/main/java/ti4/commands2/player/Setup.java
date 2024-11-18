@@ -395,7 +395,7 @@ public class Setup extends GameStateSubcommand {
             if (unitInfoTokenizer.hasMoreTokens()) {
                 planetName = AliasHandler.resolvePlanet(unitInfoTokenizer.nextToken());
             }
-            planetName = AddRemoveUnits.getPlanet(event, tile, planetName);
+            planetName = AddRemoveUnits.getPlanet(tile, planetName);
             tile.addUnit(planetName, unitID, count);
         }
     }

@@ -18,12 +18,12 @@ import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import org.apache.commons.lang3.StringUtils;
 import ti4.commands.units.AddRemoveUnits;
-import ti4.image.Mapper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Constants;
 import ti4.helpers.Helper;
 import ti4.helpers.Units.UnitKey;
 import ti4.helpers.Units.UnitType;
+import ti4.image.Mapper;
 import ti4.map.Game;
 import ti4.map.Player;
 import ti4.map.Tile;
@@ -96,7 +96,7 @@ public class AddToken extends AddRemoveToken {
         StringTokenizer planetTokenizer = new StringTokenizer(unitHolder, ",");
         while (planetTokenizer.hasMoreTokens()) {
             String planet = planetTokenizer.nextToken();
-            planet = AddRemoveUnits.getPlanet(event, tile, AliasHandler.resolvePlanet(planet));
+            planet = AddRemoveUnits.getPlanet(tile, AliasHandler.resolvePlanet(planet));
             if (!tile.isSpaceHolderValid(planet)) {
                 MessageHelper.sendMessageToChannel(channel, "Planet: " + planet + " is not valid and not supported.");
                 continue;

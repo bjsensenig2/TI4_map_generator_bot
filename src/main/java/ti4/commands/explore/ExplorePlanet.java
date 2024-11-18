@@ -18,7 +18,6 @@ import ti4.commands.planet.PlanetRefresh;
 import ti4.commands.units.AddRemoveUnits;
 import ti4.commands.units.AddUnits;
 import ti4.commands2.CommandHelper;
-import ti4.image.Mapper;
 import ti4.helpers.AgendaHelper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.ButtonHelper;
@@ -27,6 +26,7 @@ import ti4.helpers.Emojis;
 import ti4.helpers.Helper;
 import ti4.helpers.Units.UnitKey;
 import ti4.helpers.Units.UnitType;
+import ti4.image.Mapper;
 import ti4.map.Game;
 import ti4.map.Player;
 import ti4.map.Tile;
@@ -59,7 +59,7 @@ public class ExplorePlanet extends ExploreSubcommandData {
             MessageHelper.sendMessageToEventChannel(event, "System not found that contains planet");
             return;
         }
-        planetName = AddRemoveUnits.getPlanet(event, tile, AliasHandler.resolvePlanet(planetName));
+        planetName = AddRemoveUnits.getPlanet(tile, AliasHandler.resolvePlanet(planetName));
         PlanetModel planet = Mapper.getPlanet(planetName);
         if (Optional.ofNullable(planet).isEmpty()) {
             MessageHelper.sendMessageToEventChannel(event, "Invalid planet");
