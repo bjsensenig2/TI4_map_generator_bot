@@ -1,4 +1,4 @@
-package ti4.commands.status;
+package ti4.commands2.status;
 
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;

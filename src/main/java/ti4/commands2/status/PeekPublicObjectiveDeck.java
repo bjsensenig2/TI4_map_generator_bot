@@ -1,8 +1,9 @@
-package ti4.commands.status;
+package ti4.commands2.status;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
