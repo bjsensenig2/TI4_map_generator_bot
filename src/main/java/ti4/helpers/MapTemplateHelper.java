@@ -9,8 +9,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
-import ti4.commands.map.AddTile;
-import ti4.commands.map.AddTileList;
+import ti4.commands2.map.AddTile;
+import ti4.commands2.map.AddTileList;
 import ti4.commands2.milty.MiltyDraftManager;
 import ti4.commands2.milty.MiltyDraftManager.PlayerDraft;
 import ti4.commands2.milty.MiltyDraftSlice;
