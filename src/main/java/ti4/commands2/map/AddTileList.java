@@ -18,30 +18,28 @@ import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.interactions.modals.ModalMapping;
 import ti4.ResourceHelper;
-import ti4.commands.CommandHelper;
 import ti4.commands.tokens.AddFrontierTokens;
-import ti4.commands.uncategorized.ShowGame;
-import ti4.generator.Mapper;
-import ti4.generator.TileHelper;
+import ti4.commands2.GameStateSubcommand;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.DisplayType;
 import ti4.helpers.Emojis;
+import ti4.image.Mapper;
+import ti4.image.TileHelper;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.listeners.annotations.ModalHandler;
 import ti4.map.Game;
-import ti4.map.GameSaveLoadManager;
 import ti4.map.MapStringMapper;
 import ti4.map.Tile;
-import ti4.map.UserGameContextManager;
 import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
+import ti4.service.ShowGameService;
 
-public class AddTileList extends MapSubcommandData {
+public class AddTileList extends GameStateSubcommand {
 
     public AddTileList() {
-        super(Constants.ADD_TILE_LIST, "Add tile list (map string) to generate map");
+        super(Constants.ADD_TILE_LIST, "Add tile list (map string) to generate map", true, false);
         addOption(OptionType.STRING, Constants.TILE_LIST, "Tile list (map string) in TTPG/TTS format", true);
     }
 
@@ -53,18 +51,9 @@ public class AddTileList extends MapSubcommandData {
             return;
         }
 
-        String userID = member.getId();
-        Game game = CommandHelper.getGameName(event);
-        if (!UserGameContextManager.doesUserHaveContextGame(userID)) {
-            MessageHelper.replyToMessage(event, "Set your active game using: /set_game gameName");
-            return;
-        }
-
+        Game game = getGame();
         String tileList = event.getOption(Constants.TILE_LIST, "", OptionMapping::getAsString);
-
         addTileListToMap(game, tileList, event);
-
-        GameSaveLoadManager.saveGame(game, event);
     }
 
     public static void addTileListToMap(Game game, String tileList, GenericInteractionCreateEvent event) {
@@ -88,7 +77,7 @@ public class AddTileList extends MapSubcommandData {
         }
 
         MessageHelper.sendMessageToEventChannel(event, "Setting Map String to: ```\n" + tileList + "\n```");
-        ShowGame.simpleShowGame(game, event, DisplayType.map);
+        ShowGameService.simpleShowGame(game, event, DisplayType.map);
 
         if (!badTiles.isEmpty()) {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), "There were some bad tiles that were replaced with red tiles: " + badTiles + "\n");

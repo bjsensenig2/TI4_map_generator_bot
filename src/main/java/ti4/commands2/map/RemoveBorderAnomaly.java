@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import ti4.commands2.GameStateSubcommand;
 import ti4.helpers.Constants;
 import ti4.map.Game;
-import ti4.map.GameSaveLoadManager;
 import ti4.message.MessageHelper;
 
 public class RemoveBorderAnomaly extends GameStateSubcommand {
@@ -43,6 +42,5 @@ public class RemoveBorderAnomaly extends GameStateSubcommand {
         }
 
         game.removeBorderAnomaly(tile, directionVal);
-        GameSaveLoadManager.saveGame(game, event);
     }
 }

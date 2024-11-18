@@ -22,8 +22,6 @@ import org.apache.commons.lang3.function.Consumers;
 import ti4.buttons.Buttons;
 import ti4.commands.leaders.CommanderUnlockCheck;
 import ti4.commands2.GameStateSubcommand;
-import ti4.image.MapGenerator;
-import ti4.image.Mapper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.ButtonHelperAbilities;
@@ -38,6 +36,8 @@ import ti4.helpers.SecretObjectiveHelper;
 import ti4.helpers.Units.UnitKey;
 import ti4.helpers.Units.UnitType;
 import ti4.helpers.async.RoundSummaryHelper;
+import ti4.image.MapGenerator;
+import ti4.image.Mapper;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.map.Game;
 import ti4.map.Leader;
@@ -81,7 +81,7 @@ public class TurnEnd extends GameStateSubcommand {
             return;
         }
         CommanderUnlockCheck.checkPlayer(player, "hacan");
-        TurnEnd.pingNextPlayer(event, game, player);
+        pingNextPlayer(event, game, player);
         event.getMessage().delete().queue(Consumers.nop(), BotLogger::catchRestError);
 
         ButtonHelper.updateMap(game, event, "End of Turn " + player.getTurnCount() + ", Round " + game.getRound() + " for " + player.getFactionEmoji());
