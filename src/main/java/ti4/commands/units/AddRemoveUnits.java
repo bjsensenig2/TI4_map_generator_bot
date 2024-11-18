@@ -14,10 +14,10 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import org.apache.commons.lang3.StringUtils;
-import ti4.commands.Command;
 import ti4.commands.leaders.CommanderUnlockCheck;
 import ti4.commands.planet.PlanetAdd;
 import ti4.commands2.CommandHelper;
+import ti4.commands2.GameStateCommand;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.Constants;
@@ -29,7 +29,6 @@ import ti4.image.Mapper;
 import ti4.image.TileHelper;
 import ti4.map.Game;
 import ti4.map.GameManager;
-import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
 import ti4.map.Tile;
 import ti4.map.UnitHolder;
@@ -37,40 +36,34 @@ import ti4.message.MessageHelper;
 import ti4.service.ShowGameService;
 import ti4.service.combat.StartCombatService;
 
-abstract public class AddRemoveUnits implements Command {
+abstract public class AddRemoveUnits extends GameStateCommand {
+
+    public AddRemoveUnits() {
+        super(true, false);
+    }
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String userID = event.getUser().getId();
-        if (!GameManager.isUserWithActiveGame(userID)) {
-            MessageHelper.replyToMessage(event, "Set your active game using: /set_game gameName");
-            return;
-        }
-        Game game = GameManager.getUserActiveGame(userID);
-
-        String color = CommandHelper.getColor(game, event);
+        Game game = getGame();
+        // can be a color not in the game for neutral units
+        String color = getColor(game, event);
         if (!Mapper.isValidColor(color)) {
             MessageHelper.replyToMessage(event, "Color/Faction not valid");
             return;
         }
 
-        OptionMapping option = event.getOption(Constants.TILE_NAME);
-        String tileOption = option != null
-            ? StringUtils.substringBefore(
-                event.getOption(Constants.TILE_NAME, null, OptionMapping::getAsString).toLowerCase(), " ")
-            : "nombox";
-        String tileID = AliasHandler.resolveTile(tileOption);
-        Tile tile = getTileObject(event, tileID, game);
+        String tileOption = StringUtils.substringBefore(event.getOption(Constants.TILE_NAME).getAsString().toLowerCase(), " ");
+        String tileId = AliasHandler.resolveTile(tileOption);
+        Tile tile = getTileObject(event, tileId, game);
         if (tile == null)
             return;
 
         unitParsingForTile(event, color, tile, game);
+
         for (UnitHolder unitHolder_ : tile.getUnitHolders().values()) {
             addPlanetToPlayArea(event, tile, unitHolder_.getName(), game);
         }
         new AddUnits().actionAfterAll(event, tile, color, game);
-
-        GameSaveLoadManager.saveGame(game, event);
 
         boolean generateMap = !event.getOption(Constants.NO_MAPGEN, false, OptionMapping::getAsBoolean);
         if (generateMap) {
@@ -284,35 +277,36 @@ abstract public class AddRemoveUnits implements Command {
     }
 
     public static void addPlanetToPlayArea(GenericInteractionCreateEvent event, Tile tile, String planetName, Game game) {
+        if (Constants.SPACE.equals(planetName)) {
+            return;
+        }
         String userID = event.getUser().getId();
         if (game == null) {
             game = GameManager.getUserActiveGame(userID);
         }
-        // Map activeMap = mapManager.getUserActiveMap(userID);
-        if (!Constants.SPACE.equals(planetName)) {
-            UnitHolder unitHolder = tile.getUnitHolders().get(planetName);
-            if (unitHolder != null) {
-                Set<UnitKey> allUnitsOnPlanet = unitHolder.getUnits().keySet();
-                Set<String> unitColors = new HashSet<>();
-                for (UnitKey unit_ : allUnitsOnPlanet) {
-                    String unitColor = unit_.getColorID();
-                    if (unit_.getUnitType() != UnitType.Fighter) {
-                        unitColors.add(unitColor);
-                    }
+        UnitHolder unitHolder = tile.getUnitHolders().get(planetName);
+        if (unitHolder != null) {
+            Set<UnitKey> allUnitsOnPlanet = unitHolder.getUnits().keySet();
+            Set<String> unitColors = new HashSet<>();
+            for (UnitKey unit_ : allUnitsOnPlanet) {
+                String unitColor = unit_.getColorID();
+                if (unit_.getUnitType() != UnitType.Fighter) {
+                    unitColors.add(unitColor);
                 }
+            }
 
-                if (unitColors.size() == 1) {
-                    String unitColor = unitColors.iterator().next();
-                    for (Player player : game.getPlayers().values()) {
-                        if (player.getFaction() != null && player.getColor() != null) {
-                            String colorID = Mapper.getColorID(player.getColor());
-                            if (unitColor.equals(colorID)) {
-                                if (!player.getPlanetsAllianceMode().contains(planetName)) {
-                                    PlanetAdd.doAction(player, planetName, game, event, false);
-                                }
-                                break;
-                            }
+            if (unitColors.size() != 1) {
+                return;
+            }
+            String unitColor = unitColors.iterator().next();
+            for (Player player : game.getPlayers().values()) {
+                if (player.getFaction() != null && player.getColor() != null) {
+                    String colorID = Mapper.getColorID(player.getColor());
+                    if (unitColor.equals(colorID)) {
+                        if (!player.getPlanetsAllianceMode().contains(planetName)) {
+                            PlanetAdd.doAction(player, planetName, game, event, false);
                         }
+                        break;
                     }
                 }
             }
@@ -345,22 +339,34 @@ abstract public class AddRemoveUnits implements Command {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void register(CommandListUpdateAction commands) {
-        // Moderation commands with required options
         commands.addCommands(
             Commands.slash(getName(), getActionDescription())
-                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name")
-                    .setRequired(true).setAutoComplete(true))
                 .addOptions(
-                    new OptionData(OptionType.STRING, Constants.UNIT_NAMES,
-                        "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri")
-                            .setRequired(true))
-                .addOptions(
-                    new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit")
-                        .setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN,
-                    "'True' to not generate a map update with this command")));
+                    new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name")
+                        .setRequired(true)
+                        .setAutoComplete(true),
+                    new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri")
+                        .setRequired(true),
+                    new OptionData(OptionType.STRING, Constants.COLOR, "Color for unit")
+                        .setAutoComplete(true),
+                    new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command")));
     }
 
     abstract protected String getActionDescription();
 
+    public static String getColor(Game game, SlashCommandInteractionEvent event) {
+        OptionMapping factionColorOption = event.getOption(Constants.COLOR);
+        if (factionColorOption != null) {
+            String colorFromString = CommandHelper.getColorFromString(game, factionColorOption.getAsString());
+            if (Mapper.isValidColor(colorFromString)) {
+                return colorFromString;
+            }
+        } else {
+            Player foundPlayer = CommandHelper.getPlayerFromGame(game, event.getMember(), event.getUser().getId());
+            if (foundPlayer != null) {
+                return foundPlayer.getColor();
+            }
+        }
+        return null;
+    }
 }

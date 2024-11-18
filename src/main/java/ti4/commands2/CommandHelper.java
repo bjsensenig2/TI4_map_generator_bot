@@ -21,7 +21,6 @@ import net.dv8tion.jda.api.interactions.commands.SlashCommandInteraction;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ti4.image.Mapper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Constants;
 import ti4.map.Game;
@@ -174,23 +173,6 @@ public class CommandHelper {
             return " pressed `" + ((ButtonInteractionEvent) event).getButton().getId() + "`";
         }
         return " used the force";
-    }
-
-    @Nullable
-    public static String getColor(Game game, SlashCommandInteractionEvent event) {
-        OptionMapping factionColorOption = event.getOption(Constants.FACTION_COLOR);
-        if (factionColorOption != null) {
-            String colorFromString = getColorFromString(game, factionColorOption.getAsString());
-            if (Mapper.isValidColor(colorFromString)) {
-                return colorFromString;
-            }
-        } else {
-            Player foundPlayer = getPlayerFromGame(game, event.getMember(), event.getUser().getId());
-            if (foundPlayer != null) {
-                return foundPlayer.getColor();
-            }
-        }
-        return null;
     }
 
     public static String getColorFromString(Game game, String factionColor) {
