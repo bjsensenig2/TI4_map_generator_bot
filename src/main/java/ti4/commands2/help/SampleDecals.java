@@ -13,7 +13,7 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.FileUpload;
 import ti4.ResourceHelper;
-import ti4.commands.player.ChangeUnitDecal;
+import ti4.commands2.player.ChangeUnitDecal;
 import ti4.commands2.Subcommand;
 import ti4.generator.DrawingUtil;
 import ti4.generator.MapGenerator;

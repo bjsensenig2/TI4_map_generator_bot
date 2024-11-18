@@ -14,7 +14,7 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.apache.commons.lang3.StringUtils;
 import ti4.buttons.Buttons;
 import ti4.commands.leaders.CommanderUnlockCheck;
-import ti4.commands.player.ClearDebt;
+import ti4.commands2.player.ClearDebt;
 import ti4.commands2.uncategorized.CardsInfo;
 import ti4.generator.Mapper;
 import ti4.helpers.Units.UnitType;

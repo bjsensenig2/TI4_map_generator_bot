@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import org.apache.commons.lang3.StringUtils;
-import ti4.commands.player.ChangeColor;
+import ti4.commands2.player.ChangeColor;
 import ti4.draft.DraftBag;
 import ti4.draft.DraftItem;
 import ti4.generator.Mapper;

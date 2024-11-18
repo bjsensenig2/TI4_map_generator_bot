@@ -25,7 +25,7 @@ import ti4.commands.franken.StartFrankenDraft.FrankenDraftMode;
 import ti4.commands.game.Undo;
 import ti4.commands.map.Preset;
 import ti4.commands.milty.ForcePick;
-import ti4.commands.player.ChangeUnitDecal;
+import ti4.commands2.player.ChangeUnitDecal;
 import ti4.commands2.CommandHelper;
 import ti4.commands2.statistics.GameStatTypes;
 import ti4.commands2.statistics.PlayerStatTypes;

@@ -2,8 +2,8 @@ package ti4.commands2.uncategorized;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import ti4.commands.leaders.LeaderInfo;
-import ti4.commands.player.AbilityInfo;
-import ti4.commands.player.UnitInfo;
+import ti4.commands2.player.AbilityInfo;
+import ti4.commands2.player.UnitInfo;
 import ti4.commands.tech.TechInfo;
 import ti4.commands2.CommandHelper;
 import ti4.commands2.GameStateCommand;

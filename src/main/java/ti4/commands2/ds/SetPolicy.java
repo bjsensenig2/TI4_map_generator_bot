@@ -7,7 +7,7 @@ import net.dv8tion.jda.api.interactions.commands.Command.Choice;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import ti4.commands.player.AbilityInfo;
+import ti4.commands2.player.AbilityInfo;
 import ti4.commands2.CommandHelper;
 import ti4.commands2.GameStateSubcommand;
 import ti4.generator.Mapper;
