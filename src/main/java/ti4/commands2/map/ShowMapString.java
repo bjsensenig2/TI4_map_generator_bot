@@ -1,19 +1,20 @@
-package ti4.commands.map;
+package ti4.commands2.map;
 
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import ti4.commands2.GameStateSubcommand;
 import ti4.map.Game;
 import ti4.message.MessageHelper;
 
-public class ShowMapString extends MapSubcommandData {
+public class ShowMapString extends GameStateSubcommand {
 
     public ShowMapString() {
-        super("show_map_string", "Display the map string for this map");
+        super("show_map_string", "Display the map string for this map", false, false);
     }
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        Game game = getActiveGame();
+        Game game = getGame();
         showMapString(event, game);
     }
 

@@ -1,4 +1,4 @@
-package ti4.commands.map;
+package ti4.commands2.map;
 
 import java.util.Map;
 
@@ -11,6 +11,7 @@ import ti4.map.Tile;
 import ti4.map.UnitHolder;
 
 public class AddTile extends AddRemoveTile {
+
     public AddTile() {
         super(Constants.ADD_TILE, "Add tile to map");
         addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "Tile name", true).setAutoComplete(true));
@@ -29,13 +30,14 @@ public class AddTile extends AddRemoveTile {
     }
 
     public static void addCustodianToken(Tile tile) {
-        if (tile.isMecatol()) {
-            Map<String, UnitHolder> unitHolders = tile.getUnitHolders();
-            for (String mecatol : Constants.MECATOLS) {
-                UnitHolder unitHolder = unitHolders.get(mecatol);
-                if (unitHolder instanceof Planet && mecatol.equals(unitHolder.getName())) {
-                    unitHolder.addToken(Constants.CUSTODIAN_TOKEN_PNG);
-                }
+        if (!tile.isMecatol()) {
+            return;
+        }
+        Map<String, UnitHolder> unitHolders = tile.getUnitHolders();
+        for (String mecatol : Constants.MECATOLS) {
+            UnitHolder unitHolder = unitHolders.get(mecatol);
+            if (unitHolder instanceof Planet && mecatol.equals(unitHolder.getName())) {
+                unitHolder.addToken(Constants.CUSTODIAN_TOKEN_PNG);
             }
         }
     }

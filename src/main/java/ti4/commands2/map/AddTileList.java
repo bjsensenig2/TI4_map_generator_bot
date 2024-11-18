@@ -1,4 +1,4 @@
-package ti4.commands.map;
+package ti4.commands2.map;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -18,26 +18,28 @@ import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.interactions.modals.ModalMapping;
 import ti4.ResourceHelper;
+import ti4.commands.CommandHelper;
 import ti4.commands.tokens.AddFrontierTokens;
+import ti4.commands.uncategorized.ShowGame;
+import ti4.generator.Mapper;
+import ti4.generator.TileHelper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.DisplayType;
 import ti4.helpers.Emojis;
-import ti4.image.Mapper;
-import ti4.image.TileHelper;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.listeners.annotations.ModalHandler;
 import ti4.map.Game;
-import ti4.map.GameManager;
 import ti4.map.GameSaveLoadManager;
 import ti4.map.MapStringMapper;
 import ti4.map.Tile;
+import ti4.map.UserGameContextManager;
 import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
-import ti4.service.ShowGameService;
 
 public class AddTileList extends MapSubcommandData {
+
     public AddTileList() {
         super(Constants.ADD_TILE_LIST, "Add tile list (map string) to generate map");
         addOption(OptionType.STRING, Constants.TILE_LIST, "Tile list (map string) in TTPG/TTS format", true);
@@ -52,8 +54,8 @@ public class AddTileList extends MapSubcommandData {
         }
 
         String userID = member.getId();
-        Game game = GameManager.getUserActiveGame(userID);
-        if (!GameManager.isUserWithActiveGame(userID)) {
+        Game game = CommandHelper.getGameName(event);
+        if (!UserGameContextManager.doesUserHaveContextGame(userID)) {
             MessageHelper.replyToMessage(event, "Set your active game using: /set_game gameName");
             return;
         }
@@ -86,7 +88,7 @@ public class AddTileList extends MapSubcommandData {
         }
 
         MessageHelper.sendMessageToEventChannel(event, "Setting Map String to: ```\n" + tileList + "\n```");
-        ShowGameService.simpleShowGame(game, event, DisplayType.map);
+        ShowGame.simpleShowGame(game, event, DisplayType.map);
 
         if (!badTiles.isEmpty()) {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), "There were some bad tiles that were replaced with red tiles: " + badTiles + "\n");

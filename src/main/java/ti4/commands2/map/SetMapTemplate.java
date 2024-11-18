@@ -1,19 +1,20 @@
-package ti4.commands.map;
+package ti4.commands2.map;
 
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import ti4.image.Mapper;
+import ti4.commands2.GameStateSubcommand;
 import ti4.helpers.Constants;
+import ti4.image.Mapper;
 import ti4.map.Game;
 import ti4.message.MessageHelper;
 
-public class SetMapTemplate extends MapSubcommandData {
+public class SetMapTemplate extends GameStateSubcommand {
 
     public SetMapTemplate() {
-        super("set_map_template", "Set the template for the map.");
+        super("set_map_template", "Set the template for the map.", true, false);
         addOptions(new OptionData(OptionType.STRING, Constants.MAP_TEMPLATE, "Template for the map.").setRequired(true).setAutoComplete(true));
         addOption(OptionType.BOOLEAN, "transform", "True to attempt to transform the current map to the new map template.");
     }
@@ -22,7 +23,7 @@ public class SetMapTemplate extends MapSubcommandData {
     public void execute(SlashCommandInteractionEvent event) {
         String mapTemplate = event.getOption(Constants.MAP_TEMPLATE, null, OptionMapping::getAsString);
         boolean transform = event.getOption("transform", false, OptionMapping::getAsBoolean);
-        Game game = getActiveGame();
+        Game game = getGame();
 
         setMapTemplate(event, mapTemplate, transform, game);
     }

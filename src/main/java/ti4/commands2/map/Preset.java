@@ -1,17 +1,19 @@
-package ti4.commands.map;
+package ti4.commands2.map;
 
 import java.util.List;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
+import ti4.commands2.GameStateSubcommand;
 import ti4.helpers.Constants;
 import ti4.map.Game;
 import ti4.message.MessageHelper;
 
-public class Preset extends MapSubcommandData {
+public class Preset extends GameStateSubcommand {
+
     public Preset() {
-        super(Constants.PRESET, "Create a map from a template");
+        super(Constants.PRESET, "Create a map from a template", true, false);
         addOption(OptionType.STRING, Constants.MAP_TEMPLATE, "Which map template do you want to use", true, true);
         addOption(OptionType.STRING, Constants.SLICE_1, "Player 1's milty draft slice", false);
         addOption(OptionType.STRING, Constants.SLICE_2, "Player 2's slice", false);
@@ -19,11 +21,9 @@ public class Preset extends MapSubcommandData {
         addOption(OptionType.STRING, Constants.SLICE_4, "Player 4's slice", false);
         addOption(OptionType.STRING, Constants.SLICE_5, "Player 5's slice", false);
         addOption(OptionType.STRING, Constants.SLICE_6, "Player 6's slice", false);
-        //addOption(OptionType.STRING, Constants.SLICE_7, "Player 7's slice", false);
-        //addOption(OptionType.STRING, Constants.SLICE_8, "Player 8's slice", false);
     }
 
-    public static final List<String> templates = List.of("Solo (1 slice)", "Minimal Solo (1 slice)", "TspMap (6 slices)", "Magi's Madness (0 slices)");
+    public static List<String> templates = List.of("Solo (1 slice)", "Minimal Solo (1 slice)", "TspMap (6 slices)", "Magi's Madness (0 slices)");
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
@@ -31,7 +31,7 @@ public class Preset extends MapSubcommandData {
         OptionMapping template = event.getOption(Constants.MAP_TEMPLATE);
         if (template == null) return;
 
-        Game game = getActiveGame();
+        Game game = getGame();
         String slice1 = event.getOption(Constants.SLICE_1, null, OptionMapping::getAsString);
         String slice2 = event.getOption(Constants.SLICE_2, null, OptionMapping::getAsString);
         String slice3 = event.getOption(Constants.SLICE_3, null, OptionMapping::getAsString);
