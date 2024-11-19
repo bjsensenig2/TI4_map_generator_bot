@@ -1,6 +1,7 @@
 package ti4.commands.units;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
@@ -11,11 +12,15 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import org.apache.commons.lang3.StringUtils;
+import ti4.commands.leaders.CommanderUnlockCheck;
 import ti4.commands.planet.PlanetAdd;
 import ti4.commands2.CommandHelper;
 import ti4.commands2.GameStateCommand;
 import ti4.helpers.AliasHandler;
+import ti4.helpers.ButtonHelper;
 import ti4.helpers.Constants;
+import ti4.helpers.Emojis;
+import ti4.helpers.FoWHelper;
 import ti4.helpers.Units.UnitKey;
 import ti4.helpers.Units.UnitType;
 import ti4.image.Mapper;
@@ -27,6 +32,8 @@ import ti4.map.Tile;
 import ti4.map.UnitHolder;
 import ti4.message.MessageHelper;
 import ti4.service.ShowGameService;
+import ti4.service.UnitParsingService;
+import ti4.service.combat.StartCombatService;
 
 abstract public class AddRemoveUnits extends GameStateCommand {
 
@@ -89,22 +96,101 @@ abstract public class AddRemoveUnits extends GameStateCommand {
     }
 
     protected void unitParsing(GenericInteractionCreateEvent event, String color, Tile tile, String unitList, Game game) {
-        unitList = unitList.replace(", ", ",").replace("-", "").replace("'", "").toLowerCase();
-        if (!Mapper.isValidColor(color)) {
-            return;
-        }
         if (game.getPlayerFromColorOrFaction(color) == null && !game.getPlayerIDs().contains(Constants.dicecordId)) {
             game.setupNeutralPlayer(color);
         }
 
-        commonUnitParsing(event, color, tile, unitList, game);
+        var parsedUnits = UnitParsingService.parseUnits(event, color, tile, unitList, game);
+
+        parsedUnits.forEach(parsedUnit -> {
+            int numPlayersOld = 0;
+            int numPlayersNew = 0;
+            if (event instanceof SlashCommandInteractionEvent) {
+                List<Player> playersForCombat = ButtonHelper.getPlayersWithShipsInTheSystem(game, tile);
+                if (!parsedUnit.location().equalsIgnoreCase("space") && !game.isFowMode()) {
+                    playersForCombat = ButtonHelper.getPlayersWithUnitsOnAPlanet(game, tile, parsedUnit.location());
+                }
+                numPlayersOld = playersForCombat.size();
+            }
+
+            unitAction(event, tile, count, planetName, unitID, color, game);
+
+            numPlayersNew = getNumberOfPlayersIn
+            if (event instanceof SlashCommandInteractionEvent && !game.isFowMode()) {
+                List<Player> playersForCombat = ButtonHelper.getPlayersWithShipsInTheSystem(game, tile);
+                if (!parsedUnit.location().equalsIgnoreCase("space")) {
+                    playersForCombat = ButtonHelper.getPlayersWithUnitsOnAPlanet(game, tile, parsedUnit.location());
+                }
+                numPlayersNew = playersForCombat.size();
+            }
+            addPlanetToPlayArea(event, tile, planetName, game);
+            if (numPlayersNew > numPlayersOld && numPlayersOld != 0) {
+                List<Player> playersForCombat = ButtonHelper.getPlayersWithShipsInTheSystem(game, tile);
+                String combatType = "space";
+                if (!planetName.equalsIgnoreCase("space")) {
+                    combatType = "ground";
+                    playersForCombat = ButtonHelper.getPlayersWithUnitsOnAPlanet(game, tile, planetName);
+                }
+
+                // Try to get players in order of [activePlayer, otherPlayer, ... (discarded players)]
+                Player player1 = game.getActivePlayer();
+                if (player1 == null)
+                    player1 = playersForCombat.getFirst();
+                playersForCombat.remove(player1);
+                Player player2 = player1;
+                for (Player p2 : playersForCombat) {
+                    if (p2 != player1 && !player1.getAllianceMembers().contains(p2.getFaction())) {
+                        player2 = p2;
+                        break;
+                    }
+                }
+                if (player1 != player2 && !tile.getPosition().equalsIgnoreCase("nombox") && !player1.getAllianceMembers().contains(player2.getFaction())) {
+                    if ("ground".equals(combatType)) {
+                        StartCombatService.startGroundCombat(player1, player2, game, event, tile.getUnitHolderFromPlanet(planetName), tile);
+                    } else {
+                        StartCombatService.startSpaceCombat(game, player1, player2, tile, event);
+                    }
+                }
+            }
+        });
+
+        if (game.isFowMode()) {
+            boolean pingedAlready = false;
+            int countF = 0;
+            String[] tileList = game.getListOfTilesPinged();
+            while (countF < 10 && !pingedAlready) {
+                String tilePingedAlready = tileList[countF];
+                if (tilePingedAlready != null) {
+                    pingedAlready = tilePingedAlready.equalsIgnoreCase(tile.getPosition());
+                    countF++;
+                } else {
+                    break;
+                }
+            }
+            if (!pingedAlready) {
+                String colorMention = Emojis.getColorEmojiWithName(color);
+                String message = colorMention + " has modified units in the system. ";
+                if (getName().contains("add_units")) {
+                    message = message + " Specific units modified include: " + unitList;
+                }
+                message = message + "Refresh map to see what changed ";
+                FoWHelper.pingSystem(game, event, tile.getPosition(), message);
+                if (countF < 10) {
+                    game.setPingSystemCounter(countF);
+                    game.setTileAsPinged(countF, tile.getPosition());
+                }
+            }
+        }
+
+        if (getName().toLowerCase().contains("add_units")) {
+            Player player = game.getPlayerFromColorOrFaction(color);
+            if (player == null) {
+                return;
+            }
+            ButtonHelper.checkFleetAndCapacity(player, game, tile, event);
+            CommanderUnlockCheck.checkPlayer(player, "naalu", "cabal");
+        }
     }
-
-    protected String recheckColorForUnit(String unit, String color, GenericInteractionCreateEvent event) {
-        return color;
-    }
-
-
 
     protected static void addPlanetToPlayArea(GenericInteractionCreateEvent event, Tile tile, String planetName, Game game) {
         if (Constants.SPACE.equals(planetName)) {
