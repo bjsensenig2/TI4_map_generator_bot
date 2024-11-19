@@ -47,7 +47,7 @@ public class RemoveUnits extends AddRemoveUnits {
             .filter(m -> m.getUnits().getOrDefault(unitID, 0) + m.getUnitDamage().getOrDefault(unitID, 0) > 0)
             .count();
 
-        // These calcluations will let us know if we are in a scenario where we can remove all of a particular unit from
+        // These calculations will let us know if we are in a scenario where we can remove all of a particular unit from
         // the hex
         // This allows for moves like "2 infantry" when there's a hex with 0 in space and 1 infantry on each of 2 planets
         long totalUnitsOnHex = tile.getUnitHolders().values().stream()
@@ -122,7 +122,7 @@ public class RemoveUnits extends AddRemoveUnits {
     }
 
     @Override
-    protected String getActionDescription() {
+    public String getDescription() {
         return "Remove units from map";
     }
 
@@ -131,7 +131,7 @@ public class RemoveUnits extends AddRemoveUnits {
     public void register(CommandListUpdateAction commands) {
         // Moderation commands with required options
         commands.addCommands(
-            Commands.slash(getName(), getActionDescription())
+            Commands.slash(getName(), getDescription())
                 .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name").setRequired(true).setAutoComplete(true))
                 .addOptions(new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri").setRequired(true))
                 .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit").setAutoComplete(true))

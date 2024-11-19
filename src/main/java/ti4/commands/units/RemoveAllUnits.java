@@ -42,14 +42,14 @@ public class RemoveAllUnits extends AddRemoveUnits {
     public void register(CommandListUpdateAction commands) {
         // Moderation commands with required options
         commands.addCommands(
-            Commands.slash(getName(), "Remove units from map")
+            Commands.slash(getName(), getDescription())
                 .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name").setRequired(true).setAutoComplete(true))
                 .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit").setAutoComplete(true))
                 .addOptions(new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command")));
     }
 
     @Override
-    protected String getActionDescription() {
-        return "";
+    public String getDescription() {
+        return "Remove units from map";
     }
 }

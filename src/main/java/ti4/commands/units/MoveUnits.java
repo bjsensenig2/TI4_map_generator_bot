@@ -16,13 +16,13 @@ import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import org.apache.commons.lang3.StringUtils;
 import ti4.ResourceHelper;
 import ti4.commands.tokens.AddCC;
-import ti4.image.Mapper;
-import ti4.image.PositionMapper;
-import ti4.image.TileHelper;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Constants;
 import ti4.helpers.Helper;
 import ti4.helpers.Units.UnitKey;
+import ti4.image.Mapper;
+import ti4.image.PositionMapper;
+import ti4.image.TileHelper;
 import ti4.map.Game;
 import ti4.map.Player;
 import ti4.map.Tile;
@@ -307,7 +307,7 @@ public class MoveUnits extends AddRemoveUnits {
     }
 
     @Override
-    protected String getActionDescription() {
+    public String getDescription() {
         return "Move units from one system to another system";
     }
 
@@ -321,7 +321,7 @@ public class MoveUnits extends AddRemoveUnits {
     public void register(CommandListUpdateAction commands) {
         // Moderation commands with required options
         commands.addCommands(
-            Commands.slash(getName(), getActionDescription())
+            Commands.slash(getName(), getDescription())
                 .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile to move units from").setRequired(true).setAutoComplete(true))
                 .addOptions(new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri").setRequired(true))
                 .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME_TO, "System/Tile to move units to")

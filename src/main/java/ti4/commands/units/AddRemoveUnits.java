@@ -63,7 +63,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         for (UnitHolder unitHolder_ : tile.getUnitHolders().values()) {
             addPlanetToPlayArea(event, tile, unitHolder_.getName(), game);
         }
-        new AddUnits().actionAfterAll(event, tile, color, game);
+        new AddUnits().actionAfterAll(event, tile, color, game); // TODO: shouldn't do this, instantiating subclass here
 
         boolean generateMap = !event.getOption(Constants.NO_MAPGEN, false, OptionMapping::getAsBoolean);
         if (generateMap) {
@@ -73,7 +73,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         }
     }
 
-    public Tile getTileObject(SlashCommandInteractionEvent event, String tileID, Game game) {
+    protected Tile getTileObject(SlashCommandInteractionEvent event, String tileID, Game game) {
         return TileHelper.getTile(event, tileID, game);
     }
 
@@ -87,17 +87,16 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         unitParsing(event, color, tile, unitList, game);
     }
 
-    public void unitParsing(SlashCommandInteractionEvent event, String color, Tile tile, String unitList, Game game) {
-
+    protected void unitParsing(SlashCommandInteractionEvent event, String color, Tile tile, String unitList, Game game) {
         if (game.getPlayerFromColorOrFaction(color) == null && !game.getPlayerIDs().contains(Constants.dicecordId)) {
             game.setupNeutralPlayer(color);
         }
 
         commonUnitParsing(event, color, tile, unitList, game);
-        actionAfterAll((GenericInteractionCreateEvent) event, tile, color, game);
+        actionAfterAll(event, tile, color, game);
     }
 
-    public void unitParsing(GenericInteractionCreateEvent event, String color, Tile tile, String unitList, Game game) {
+    protected void unitParsing(GenericInteractionCreateEvent event, String color, Tile tile, String unitList, Game game) {
         unitList = unitList.replace(", ", ",").replace("-", "").replace("'", "").toLowerCase();
         if (!Mapper.isValidColor(color)) {
             return;
@@ -107,15 +106,13 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         }
 
         commonUnitParsing(event, color, tile, unitList, game);
-        actionAfterAll(event, tile, color, game);
     }
 
     protected String recheckColorForUnit(String unit, String color, GenericInteractionCreateEvent event) {
         return color;
     }
 
-    public void commonUnitParsing(GenericInteractionCreateEvent event, String color, Tile tile, String unitList,
-        Game game) {
+    protected void commonUnitParsing(GenericInteractionCreateEvent event, String color, Tile tile, String unitList, Game game) {
         unitList = unitList.replace(", ", ",");
         StringTokenizer unitListTokenizer = new StringTokenizer(unitList, ",");
 
@@ -215,8 +212,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
                     playersForCombat = ButtonHelper.getPlayersWithUnitsOnAPlanet(game, tile, planetName);
                 }
 
-                // Try to get players in order of [activePlayer, otherPlayer, ... (discarded
-                // players)]
+                // Try to get players in order of [activePlayer, otherPlayer, ... (discarded players)]
                 Player player1 = game.getActivePlayer();
                 if (player1 == null)
                     player1 = playersForCombat.getFirst();
@@ -254,7 +250,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
             if (!pingedAlready) {
                 String colorMention = Emojis.getColorEmojiWithName(color);
                 String message = colorMention + " has modified units in the system. ";
-                if (getActionDescription().contains("add_units")) {
+                if (getName().contains("add_units")) {
                     message = message + " Specific units modified include: " + unitList;
                 }
                 message = message + "Refresh map to see what changed ";
@@ -266,7 +262,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
             }
         }
 
-        if (getActionDescription().toLowerCase().contains("add units")) {
+        if (getName().toLowerCase().contains("add_units")) {
             Player player = game.getPlayerFromColorOrFaction(color);
             if (player == null) {
                 return;
@@ -276,7 +272,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         }
     }
 
-    public static void addPlanetToPlayArea(GenericInteractionCreateEvent event, Tile tile, String planetName, Game game) {
+    protected static void addPlanetToPlayArea(GenericInteractionCreateEvent event, Tile tile, String planetName, Game game) {
         if (Constants.SPACE.equals(planetName)) {
             return;
         }
@@ -313,7 +309,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         }
     }
 
-    public static String getPlanet(Tile tile, String planetName) {
+    protected static String getPlanet(Tile tile, String planetName) {
         if (tile.isSpaceHolderValid(planetName))
             return planetName;
         return tile.getUnitHolders().keySet().stream()
@@ -332,15 +328,11 @@ abstract public class AddRemoveUnits extends GameStateCommand {
         // do nothing, overriden by child classes
     }
 
-    protected void actionAfterAll(GenericInteractionCreateEvent event, Tile tile, String color, Game game) {
-        // do nothing, overriden by child classes
-    }
-
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void register(CommandListUpdateAction commands) {
         commands.addCommands(
-            Commands.slash(getName(), getActionDescription())
+            Commands.slash(getName(), getDescription())
                 .addOptions(
                     new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name")
                         .setRequired(true)
@@ -352,9 +344,7 @@ abstract public class AddRemoveUnits extends GameStateCommand {
                     new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command")));
     }
 
-    abstract protected String getActionDescription();
-
-    public static String getColor(Game game, SlashCommandInteractionEvent event) {
+    private static String getColor(Game game, SlashCommandInteractionEvent event) {
         OptionMapping factionColorOption = event.getOption(Constants.COLOR);
         if (factionColorOption != null) {
             String colorFromString = CommandHelper.getColorFromString(game, factionColorOption.getAsString());

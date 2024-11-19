@@ -20,6 +20,7 @@ import ti4.map.UnitHolder;
 import ti4.message.MessageHelper;
 
 public class AddUnits extends AddRemoveUnits {
+
     @Override
     protected void unitAction(SlashCommandInteractionEvent event, Tile tile, int count, String planetName, UnitKey unitID, String color, Game game) {
         tile.addUnit(planetName, unitID, count);
@@ -80,7 +81,7 @@ public class AddUnits extends AddRemoveUnits {
     }
 
     @Override
-    protected String getActionDescription() {
+    public String getDescription() {
         return "Add units to map";
     }
 
@@ -88,11 +89,16 @@ public class AddUnits extends AddRemoveUnits {
     @Override
     public void register(CommandListUpdateAction commands) {
         commands.addCommands(
-            Commands.slash(getName(), getActionDescription())
-                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name").setRequired(true).setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri").setRequired(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.CC_USE, "Type tactics or t, retreat, reinforcements or r - default is 'no'").setAutoComplete(true))
-                .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit").setAutoComplete(true))
+            Commands.slash(getName(), getDescription())
+                .addOptions(new OptionData(OptionType.STRING, Constants.TILE_NAME, "System/Tile name")
+                    .setRequired(true)
+                    .setAutoComplete(true))
+                .addOptions(new OptionData(OptionType.STRING, Constants.UNIT_NAMES, "Comma separated list of '{count} unit {planet}' Eg. 2 infantry primor, carrier, 2 fighter, mech pri")
+                    .setRequired(true))
+                .addOptions(new OptionData(OptionType.STRING, Constants.CC_USE, "Type tactics or t, retreat, reinforcements or r - default is 'no'")
+                    .setAutoComplete(true))
+                .addOptions(new OptionData(OptionType.STRING, Constants.FACTION_COLOR, "Faction or Color for unit")
+                    .setAutoComplete(true))
                 .addOptions(new OptionData(OptionType.BOOLEAN, Constants.SLING_RELAY, "Declare use of and exhaust Sling Relay Tech"))
                 .addOptions(new OptionData(OptionType.BOOLEAN, Constants.NO_MAPGEN, "'True' to not generate a map update with this command")));
     }

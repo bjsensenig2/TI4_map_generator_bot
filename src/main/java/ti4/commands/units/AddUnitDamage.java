@@ -25,7 +25,7 @@ public class AddUnitDamage extends AddRemoveUnits {
     }
 
     @Override
-    protected String getActionDescription() {
+    public String getDescription() {
         return "Add unit damage to map";
     }
 
