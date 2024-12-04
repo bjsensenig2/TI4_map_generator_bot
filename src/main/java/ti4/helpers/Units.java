@@ -1,6 +1,5 @@
 package ti4.helpers;
 
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,7 +50,7 @@ public class Units {
 
         @JsonIgnore
         public String getFileName() {
-            return getFileName(ThreadLocalRandom.current().nextInt(Constants.EYE_CHANCE) == 0);
+            return getFileName(RandomHelper.isOneInX(Constants.EYE_CHANCE));
         }
 
         public String getFileName(boolean eyes) {

@@ -28,6 +28,7 @@ import ti4.service.turn.StartTurnService;
 import ti4.service.unit.AddUnitService;
 import ti4.service.unit.ParsedUnit;
 import ti4.service.unit.RemoveUnitService;
+import ti4.users.UserSettingsManager;
 
 public class ButtonHelperTacticalAction {
 
@@ -93,8 +94,7 @@ public class ButtonHelperTacticalAction {
                             if (!player.unitBelongsToPlayer(unitEntry.getKey()))
                                 continue;
                             UnitKey unitKey = unitEntry.getKey();
-                            if ((unitKey.getUnitType() == UnitType.Infantry
-                                || unitKey.getUnitType() == UnitType.Mech)) {
+                            if (unitKey.getUnitType() == UnitType.Infantry || unitKey.getUnitType() == UnitType.Mech) {
                                 String unitName = unitKey.unitName();
                                 int amount = unitEntry.getValue();
                                 int totalUnits = amount;
@@ -252,7 +252,7 @@ public class ButtonHelperTacticalAction {
         } else {
             game.setSpecificCurrentMovedUnitsFrom1System(rest, amount);
         }
-        if (currentSystem.get(rest) == 0) {
+        if (currentSystem.containsKey(rest) && currentSystem.get(rest) == 0) {
             currentSystem.remove(rest);
         }
         if (currentActivation.containsKey(unitName)) {
@@ -260,6 +260,9 @@ public class ButtonHelperTacticalAction {
                 currentActivation.get(unitName) + amount);
         } else {
             game.setSpecificCurrentMovedUnitsFrom1TacticalAction(unitName, amount);
+        }
+        if (currentActivation.containsKey(rest) && currentActivation.get(rest) == 0) {
+            currentActivation.remove(rest);
         }
         String message = ButtonHelper.buildMessageFromDisplacedUnits(game, false, player, remove, tile);
         List<Button> systemButtons = getButtonsForAllUnitsInSystem(player, game, game.getTileByPosition(pos), remove);
@@ -400,7 +403,7 @@ public class ButtonHelperTacticalAction {
             }
             List<Button> empyButtons = new ArrayList<>();
             if (!game.getMovedUnitsFromCurrentActivation().isEmpty()
-                && (tile.getUnitHolders().values().size() == 1) && player.hasUnexhaustedLeader("empyreanagent")) {
+                && (tile.getUnitHolders().size() == 1) && player.hasUnexhaustedLeader("empyreanagent")) {
                 Button empyButton = Buttons.gray("exhaustAgent_empyreanagent",
                     "Use Empyrean Agent", Emojis.Empyrean);
                 empyButtons.add(empyButton);
@@ -411,7 +414,7 @@ public class ButtonHelperTacticalAction {
                     empyButtons);
             }
             if (!game.getMovedUnitsFromCurrentActivation().isEmpty()
-                && (tile.getUnitHolders().values().size() == 1) && player.getPlanets().contains("ghoti")) {
+                && (tile.getUnitHolders().size() == 1) && player.getPlanets().contains("ghoti")) {
                 player.setCommodities(player.getCommodities() + 1);
                 MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
                     player.getRepresentation()
@@ -509,7 +512,8 @@ public class ButtonHelperTacticalAction {
         player.setWhetherPlayerShouldBeTenMinReminded(false);
         game.resetCurrentMovedUnitsFrom1TacticalAction();
 
-        if (player.doesPlayerPreferDistanceBasedTacticalActions() && !game.isFowMode() && game.getRingCount() < 5) {
+        boolean prefersDistanceBasedTacticalActions = UserSettingsManager.get(player.getUserID()).isPrefersDistanceBasedTacticalActions();
+        if (!game.isFowMode() && game.getRingCount() < 5 && prefersDistanceBasedTacticalActions) {
             alternateWayOfOfferingTiles(player, game);
         } else {
             String message = "Doing a tactical action. Please select the ring of the map that the system you want to activate is located in."
@@ -629,7 +633,7 @@ public class ButtonHelperTacticalAction {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), msg);
             AddTokenCommand.addToken(event, tile, Constants.FRONTIER, game);
         }
-        List<Button> button2 = ButtonHelper.scanlinkResolution(player, game, event);
+        List<Button> button2 = ButtonHelper.scanlinkResolution(player, game);
         if ((player.getTechs().contains("sdn") || player.getTechs().contains("absol_sdn")) && !button2.isEmpty() && !game.isL1Hero()) {
             MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(), player.getRepresentation() + ", Please resolve Scanlink Drone Network.", button2);
             if (player.hasAbility("awaken") || player.hasUnit("titans_flagship")) {
@@ -664,16 +668,6 @@ public class ButtonHelperTacticalAction {
             if (!game.isL1Hero()) {
                 ButtonHelper.resolveOnActivationEnemyAbilities(game, game.getTileByPosition(pos), player, false, event);
             }
-            // if (abilities > 0 ) {
-            // List<Button> buttons = new ArrayList<>();
-            // buttons.add(Buttons.green("doActivation_" + pos, "Confirm"));
-            // buttons.add(Buttons.red("deleteButtons", "This activation was a mistake"));
-            // String msg = "# " + player.getFactionEmoji() + " You are about to
-            // automatically trigger some abilities by activating this system. Please hit
-            // confirm before continuing";
-            // MessageHelper.sendMessageToChannelWithButtons(event.getMessageChannel(), msg,
-            // buttons);
-            // }
         }
         game.setStoredValue("crucibleBoost", "");
         game.setStoredValue("flankspeedBoost", "");
@@ -783,7 +777,7 @@ public class ButtonHelperTacticalAction {
                 buttons.add(validTile2);
             }
         }
-        if (!displacedUnits.keySet().isEmpty()) {
+        if (!displacedUnits.isEmpty()) {
             Button validTile2 = Buttons.green(finChecker + "unitTactical" + moveOrRemove + "_" + tile.getPosition() + "_reverseAll", "Undo all");
             buttons.add(validTile2);
         }

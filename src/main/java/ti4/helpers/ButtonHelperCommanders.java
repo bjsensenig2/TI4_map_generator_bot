@@ -3,7 +3,6 @@ package ti4.helpers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,13 +32,15 @@ import ti4.service.planet.FlipTileService;
 import ti4.service.unit.AddUnitService;
 import ti4.service.unit.RemoveUnitService;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 public class ButtonHelperCommanders {
 
     @ButtonHandler("cheiranCommanderBlock_")
     public static void cheiranCommanderBlock(Player player, Game game, ButtonInteractionEvent event) {
-        String msg2 = "";
-        int oldThing = 0;
-        int newThing = 0;
+        String msg2;
+        int oldThing;
+        int newThing;
         if (player.getCommodities() > 0) {
             oldThing = player.getCommodities();
             player.setCommodities(oldThing - 1);
@@ -92,7 +93,7 @@ public class ButtonHelperCommanders {
             List<Button> stuffToTransButtons = ButtonHelper.getForcedPNSendButtons(game, player, p2);
             String message = p2.getRepresentationUnfogged()
                 + " You've been hit by"
-                + (ThreadLocalRandom.current().nextInt(1000) == 0 ? ", you've been struck by" : "")
+                + (RandomHelper.isOneInX(1000) ? ", you've been struck by" : "")
                 + " S'ula Mentarion, the Mentak commander. Please select the PN you would like to send.";
             MessageHelper.sendMessageToChannelWithButtons(p2.getCardsInfoThread(), message, stuffToTransButtons);
             MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
@@ -358,7 +359,7 @@ public class ButtonHelperCommanders {
     public static void resolveGhostCommanderPlacement(Player player, Game game, String buttonID, ButtonInteractionEvent event) {
         String pos = buttonID.split("_")[1];
         Tile tile = game.getTileByPosition(pos);
-        AddUnitService.addUnits(event, tile, game, player.getColor(),  "fighter");
+        AddUnitService.addUnits(event, tile, game, player.getColor(), "fighter");
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(), player.getFactionEmoji() + " placed 1 fighter in " + tile.getRepresentation() + " using Sai Seravus, the Creuss commander");
     }
 
@@ -366,7 +367,7 @@ public class ButtonHelperCommanders {
     public static void resolveKhraskCommanderPlacement(Player player, Game game, String buttonID, ButtonInteractionEvent event) {
         String pos = buttonID.split("_")[1];
         Tile tile = game.getTileByPosition(pos);
-        AddUnitService.addUnits(event, tile, game, player.getColor(),  "inf");
+        AddUnitService.addUnits(event, tile, game, player.getColor(), "inf");
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
             player.getFactionEmoji() + " placed 1 infantry in " + tile.getRepresentation()
                 + " using Hkot Tokal, the Khrask Commander.");
@@ -379,8 +380,7 @@ public class ButtonHelperCommanders {
         List<Button> buttons = new ArrayList<>();
         for (String planet : player.getExhaustedPlanets()) {
             Planet planetReal = (Planet) ButtonHelper.getUnitHolderFromPlanetName(planet, game);
-            if (planetReal != null && planetReal.getOriginalPlanetType() != null
-                && player.getPlanetsAllianceMode().contains(planet)) {
+            if (planetReal != null && isNotBlank(planetReal.getOriginalPlanetType()) && player.getPlanetsAllianceMode().contains(planet)) {
                 List<Button> planetButtons = ButtonHelper.getPlanetExplorationButtons(game, planetReal, player);
                 buttons.addAll(planetButtons);
             }
@@ -475,7 +475,7 @@ public class ButtonHelperCommanders {
         String planet = buttonID.split("_")[1];
         ButtonHelper.deleteTheOneButton(event);
         Tile tile = game.getTileFromPlanet(planet);
-        AddUnitService.addUnits(event, tile, game,  player.getColor(),  "1 inf " + planet);
+        AddUnitService.addUnits(event, tile, game, player.getColor(), "1 inf " + planet);
         MessageHelper.sendMessageToChannel(event.getMessageChannel(),
             player.getFactionEmoji() + " placed 1 infantry on "
                 + Helper.getPlanetRepresentation(planet, game) + " using Claire Gibson, the Sol Commander.");
@@ -512,7 +512,7 @@ public class ButtonHelperCommanders {
 
     @ButtonHandler("pay1tgforKeleres")
     public static void pay1tgToUnlockKeleres(Player player, Game game, ButtonInteractionEvent event) {
-        boolean unleash = ThreadLocalRandom.current().nextInt(20) == 0;
+        boolean unleash = RandomHelper.isOneInX(20);
         CommanderUnlockCheckService.checkPlayer(player, "keleres");
         MessageHelper.sendMessageToChannel(player.getCorrectChannel(), player.getFactionEmojiOrColor() + " paid 1TG to " + (unleash ? "unleash" : "unlock") + " Suffi An, the Keleres commander " + player.gainTG(-1));
         event.getMessage().delete().queue();
@@ -530,8 +530,7 @@ public class ButtonHelperCommanders {
             + planetRepresentation + " using G'hom Sek'kus, the N'orr Commander.";
         RemoveUnitService.removeUnits(event, game.getTileFromPlanet(planet2), game, player.getColor(), "1 " + mechorInf + " " + planet2);
 
-        Tile tile = game.getTileFromPlanet(planet1);
-        tile = FlipTileService.flipTileIfNeeded(event, tile, game);
+        FlipTileService.flipTileIfNeeded(event, game.getTileFromPlanet(planet1), game);
         planet1 = planet1.replace("lockedm", "m");
         AddUnitService.addUnits(event, game.getTileFromPlanet(planet1), game, player.getColor(), "1 " + mechorInf + " " + planet1);
 

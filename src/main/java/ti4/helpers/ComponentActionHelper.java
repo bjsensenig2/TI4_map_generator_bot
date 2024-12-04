@@ -423,8 +423,6 @@ public class ComponentActionHelper {
                     }
                 } else if ("mantlecracking".equalsIgnoreCase(buttonID)) {
                     List<Button> buttons = ButtonHelperAbilities.getMantleCrackingButtons(p1, game);
-                    // MessageHelper.sendMessageToChannel(event.getChannel(),
-                    // p1.getFactionEmoji()+" Chose to use the mantle cracking ability");
                     String message = "Select the planet you would like to mantle crack";
                     MessageHelper.sendMessageToChannelWithButtons(event.getMessageChannel(), message, buttons);
                 } else if ("meditation".equalsIgnoreCase(buttonID)) {
@@ -440,7 +438,7 @@ public class ComponentActionHelper {
                         MessageHelper.sendMessageToChannel(event.getMessageChannel(), successMessage);
                     }
                     String message = "Select the tech you would like to ready";
-                    MessageHelper.sendMessageToChannel(event.getMessageChannel(), message, ButtonHelper.getAllTechsToReady(game, p1));
+                    MessageHelper.sendMessageToChannel(event.getMessageChannel(), message, ButtonHelper.getAllTechsToReady(p1));
                     List<Button> buttons = StartTurnService.getStartOfTurnButtons(p1, game, true, event);
                     String message2 = "Use buttons to end turn or do another action";
                     MessageHelper.sendMessageToChannelWithButtons(event.getChannel(), message2, buttons);
@@ -607,9 +605,7 @@ public class ComponentActionHelper {
                 MessageHelper.sendMessageToChannelWithButtons(event.getMessageChannel(), message,
                     ButtonHelper.getButtonsForStellar(player, game));
             }
-            case "passturn" -> {
-                MessageHelper.sendMessageToChannelWithButton(event.getChannel(), null, Buttons.REDISTRIBUTE_CCs);
-            }
+            case "passturn" -> MessageHelper.sendMessageToChannelWithButton(event.getChannel(), null, Buttons.REDISTRIBUTE_CCs);
             case "titanprototype", "absol_jr" -> {
                 // handled above
             }

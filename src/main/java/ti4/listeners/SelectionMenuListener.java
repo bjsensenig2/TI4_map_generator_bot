@@ -9,6 +9,7 @@ import ti4.message.BotLogger;
 import ti4.selections.SelectionMenuProvider;
 
 public class SelectionMenuListener extends ListenerAdapter {
+
     @Override
     public void onStringSelectInteraction(@NotNull StringSelectInteractionEvent event) {
         if (!AsyncTI4DiscordBot.isReadyToReceiveCommands()) {
@@ -18,6 +19,10 @@ public class SelectionMenuListener extends ListenerAdapter {
 
         event.deferEdit().queue();
 
+        AsyncTI4DiscordBot.runAsync("Selection menu task", () -> handleSelectionEvent(event));
+    }
+
+    private void handleSelectionEvent(StringSelectInteractionEvent event) {
         try {
             SelectionMenuContext context = new SelectionMenuContext(event);
             if (context.isValid()) {

@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import ti4.commands2.CommandHelper;
 import ti4.commands2.GameStateCommand;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.CheckDistanceHelper;
@@ -43,12 +42,6 @@ public class ShowDistancesCommand extends GameStateCommand {
     }
 
     @Override
-    public boolean accept(SlashCommandInteractionEvent event) {
-        return super.accept(event) &&
-            CommandHelper.acceptIfPlayerInGameAndGameChannel(event);
-    }
-
-    @Override
     public void execute(SlashCommandInteractionEvent event) {
         OptionMapping tileOption = event.getOption(Constants.TILE_NAME);
         if (tileOption == null) {
@@ -67,7 +60,7 @@ public class ShowDistancesCommand extends GameStateCommand {
         int maxDistance = event.getOption(Constants.MAX_DISTANCE, 10, OptionMapping::getAsInt);
         game.setTileDistances(CheckDistanceHelper.getTileDistances(game, player, tile.getPosition(), maxDistance, true));
 
-        MapRenderPipeline.render(game, event, DisplayType.map,
+        MapRenderPipeline.queue(game, event, DisplayType.map,
                 fileUpload -> MessageHelper.sendFileUploadToChannel(event.getMessageChannel(), fileUpload));
     }
 }

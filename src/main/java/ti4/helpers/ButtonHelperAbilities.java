@@ -34,6 +34,8 @@ import ti4.service.unit.AddUnitService;
 import ti4.service.unit.ParsedUnit;
 import ti4.service.unit.RemoveUnitService;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 public class ButtonHelperAbilities {
 
     public static void autoneticMemoryStep1(Game game, Player player, int count) {
@@ -103,9 +105,8 @@ public class ButtonHelperAbilities {
     @ButtonHandler("rallyToTheCauseStep2_")
     public static void rallyToTheCauseStep2(Game game, Player player, ButtonInteractionEvent event, String buttonID) {
         String pos = buttonID.split("_")[1];
-        List<Button> buttons = new ArrayList<>();
         String type = "sling";
-        buttons = Helper.getPlaceUnitButtons(event, player, game, game.getTileByPosition(pos), type, "placeOneNDone_dontskip");
+        List<Button> buttons = Helper.getPlaceUnitButtons(event, player, game, game.getTileByPosition(pos), type, "placeOneNDone_dontskip");
         String message = player.getRepresentation() + " Use the buttons to produce the first of potentially 2 ships. "
             + ButtonHelper.getListOfStuffAvailableToSpend(player, game);
         String message2 = player.getRepresentation() + " Use the buttons to produce the second of potentially 2 ships. "
@@ -1030,7 +1031,7 @@ public class ButtonHelperAbilities {
             UnitHolder planetUnit = ButtonHelper.getUnitHolderFromPlanetName(planet, game);
             Planet planetReal = (Planet) planetUnit;
             List<Button> buttons = new ArrayList<>();
-            if (planetReal.getOriginalPlanetType() != null && player.getPlanetsAllianceMode().contains(planet)
+            if (planetReal != null && isNotBlank(planetReal.getOriginalPlanetType()) && player.getPlanetsAllianceMode().contains(planet)
                 && FoWHelper.playerHasUnitsOnPlanet(player, game.getTileFromPlanet(planet), planet)) {
                 List<Button> planetButtons = ButtonHelper.getPlanetExplorationButtons(game, planetReal, player);
 
@@ -1234,7 +1235,7 @@ public class ButtonHelperAbilities {
     public static void resolveMitosisMechPlacement(String buttonID, ButtonInteractionEvent event, Game game, Player player) {
         Tile tile = game.getTileByPosition(buttonID.split("_")[1]);
         String uH = buttonID.split("_")[2];
-        String successMessage = "";
+        String successMessage;
         if ("space".equalsIgnoreCase(uH)) {
             successMessage = player.getFactionEmojiOrColor() + " Replaced 1 infantry with 1 mech in the space area of " + tile.getRepresentationForButtons(game, player) + ".";
         } else {

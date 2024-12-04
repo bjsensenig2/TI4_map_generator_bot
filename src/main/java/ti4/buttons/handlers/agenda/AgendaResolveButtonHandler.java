@@ -398,7 +398,6 @@ class AgendaResolveButtonHandler {
                 for (Player player : game.getRealPlayers()) {
                     if (player.getPlanets().contains(winner.toLowerCase())) {
                         UnitHolder uH = ButtonHelper.getUnitHolderFromPlanetName(winner, game);
-                        int count = 0;
                         Player cabalMechOwner = Helper.getPlayerFromUnit(game, "cabal_mech");
                         boolean cabalMech = cabalMechOwner != null
                             && uH.getUnitCount(Units.UnitType.Mech, cabalMechOwner.getColor()) > 0
@@ -424,7 +423,6 @@ class AgendaResolveButtonHandler {
                                 ButtonHelperFactionSpecific.cabalEatsUnit(player, game, cabalFSOwner,
                                     uH.getUnitCount(Units.UnitType.Mech, player.getColor()), "mech", event);
                             }
-                            count = count + uH.getUnitCount(Units.UnitType.Mech, player.getColor());
                             uH.removeUnit(Mapper.getUnitKey(AliasHandler.resolveUnit("mech"), player.getColorID()),
                                 uH.getUnitCount(Units.UnitType.Mech, player.getColor()));
                         }
@@ -433,14 +431,12 @@ class AgendaResolveButtonHandler {
                                 ButtonHelperFactionSpecific.offerMahactInfButtons(player, game);
                             }
                             if (player.hasInf2Tech()) {
-                                ButtonHelper.resolveInfantryDeath(game, player,
-                                    uH.getUnitCount(Units.UnitType.Infantry, player.getColor()));
+                                ButtonHelper.resolveInfantryDeath(player, uH.getUnitCount(Units.UnitType.Infantry, player.getColor()));
                             }
                             if (cabalFS || cabalMech) {
                                 ButtonHelperFactionSpecific.cabalEatsUnit(player, game, cabalFSOwner,
                                     uH.getUnitCount(Units.UnitType.Infantry, player.getColor()), "infantry", event);
                             }
-                            count = count + uH.getUnitCount(Units.UnitType.Infantry, player.getColor());
                             uH.removeUnit(Mapper.getUnitKey(AliasHandler.resolveUnit("infantry"), player.getColorID()),
                                 uH.getUnitCount(Units.UnitType.Infantry, player.getColor()));
                         }
@@ -505,8 +501,7 @@ class AgendaResolveButtonHandler {
                                 ButtonHelperFactionSpecific.offerMahactInfButtons(player, game);
                             }
                             if (player.hasInf2Tech()) {
-                                ButtonHelper.resolveInfantryDeath(game, player,
-                                    uH.getUnitCount(Units.UnitType.Infantry, player.getColor()));
+                                ButtonHelper.resolveInfantryDeath(player, uH.getUnitCount(Units.UnitType.Infantry, player.getColor()));
                             }
                             if (cabalFS || cabalMech) {
                                 ButtonHelperFactionSpecific.cabalEatsUnit(player, game, cabalFSOwner,
@@ -684,6 +679,40 @@ class AgendaResolveButtonHandler {
                         "# Removed all laws, will exhaust all home planets at the start of next Strategy phase");
                 }
             }
+            if ("absol_constitution".equalsIgnoreCase(agID)) {
+                if ("for".equalsIgnoreCase(winner)) {
+                    List<String> laws = new ArrayList<>(game.getLaws().keySet());
+                    for (String law : laws) {
+                        game.removeLaw(law);
+                    }
+                    MessageHelper.sendMessageToChannel(game.getMainGameChannel(),
+                        "# Removed all laws");
+                    int counter = 40;
+                    boolean lawFound = false;
+                    ArrayList<String> discardedAgendas = new ArrayList<>();
+                    while (counter > 0 && !lawFound) {
+                        counter--;
+                        String id2 = game.revealAgenda(false);
+                        AgendaModel agendaDetails = Mapper.getAgenda(id2);
+                        if (agendaDetails.getType().equalsIgnoreCase("law")) {
+                            lawFound = true;
+                            game.putAgendaBackIntoDeckOnTop(id2);
+                            AgendaHelper.revealAgenda(event, false, game, game.getMainGameChannel());
+                            MessageHelper.sendMessageToChannel(game.getMainGameChannel(),
+                                "Shuffled the found agendas back in");
+                            for (String id3 : discardedAgendas) {
+                                game.putAgendaBackIntoDeckOnTop(id3);
+                            }
+                            game.shuffleAgendas();
+                        } else {
+                            discardedAgendas.add(id2);
+                            MessageHelper.sendMessageToChannel(game.getMainGameChannel(),
+                                "Found the non-law agenda: " + agendaDetails.getName());
+                        }
+                    }
+
+                }
+            }
             if ("artifact".equalsIgnoreCase(agID) || "little_omega_artifact".equalsIgnoreCase(agID)) {
                 TextChannel watchParty = AgendaHelper.watchPartyChannel(game);
                 String watchPartyPing = AgendaHelper.watchPartyPing(game);
@@ -847,8 +876,6 @@ class AgendaResolveButtonHandler {
                     }
                     MessageHelper.sendMessageToChannel(game.getMainGameChannel(),
                         "Drew 2 ACs for each of the players who voted for and gave 1 strat CC to those who voted against");
-                } else {
-
                 }
             }
             if ("economic_equality".equalsIgnoreCase(agID)) {
@@ -885,29 +912,16 @@ class AgendaResolveButtonHandler {
                 if (!game.isHomebrewSCMode()) {
                     List<Button> scButtons = new ArrayList<>();
                     switch (winner) {
-                        case "1" -> {
-                            scButtons.add(Buttons.green("leadershipGenerateCCButtons", "Spend & Gain CCs"));
-                            //scButtons.add(Buttons.red("leadershipExhaust", "Exhaust Planets"));
-                        }
-                        case "2" -> {
-                            scButtons.add(Buttons.green("diploRefresh2", "Ready 2 Planets"));
-                        }
-                        case "3" -> {
-                            scButtons.add(Buttons.gray("sc_ac_draw", "Draw 2 Action Cards", Emojis.ActionCard));
-                        }
+                        case "1" -> scButtons.add(Buttons.green("leadershipGenerateCCButtons", "Spend & Gain CCs"));
+                        case "2" -> scButtons.add(Buttons.green("diploRefresh2", "Ready 2 Planets"));
+                        case "3" -> scButtons.add(Buttons.gray("sc_ac_draw", "Draw 2 Action Cards", Emojis.ActionCard));
                         case "4" -> {
                             scButtons.add(Buttons.green("construction_spacedock", "Place 1 space dock", Emojis.spacedock));
                             scButtons.add(Buttons.green("construction_pds", "Place 1 PDS", Emojis.pds));
                         }
-                        case "5" -> {
-                            scButtons.add(Buttons.gray("sc_refresh", "Replenish Commodities", Emojis.comm));
-                        }
-                        case "6" -> {
-                            scButtons.add(Buttons.green("warfareBuild", "Build At Home"));
-                        }
-                        case "7" -> {
-                            scButtons.add(Buttons.GET_A_TECH);
-                        }
+                        case "5" -> scButtons.add(Buttons.gray("sc_refresh", "Replenish Commodities", Emojis.comm));
+                        case "6" -> scButtons.add(Buttons.green("warfareBuild", "Build At Home"));
+                        case "7" -> scButtons.add(Buttons.GET_A_TECH);
                         case "8" -> {
                             PlayStrategyCardService.handleSOQueueing(game, false);
                             scButtons.add(Buttons.gray("sc_draw_so", "Draw Secret Objective", Emojis.SecretObjective));
@@ -916,10 +930,6 @@ class AgendaResolveButtonHandler {
                     MessageHelper.sendMessageToChannel(actionsChannel,
                         "You may use this button to resolve the secondary.", scButtons);
                 }
-            }
-
-            if (game.getCurrentAgendaInfo().contains("Law")) {
-                // Figure out law
             }
         }
         List<Player> riders = AgendaHelper.getWinningRiders(winner, game, event);
@@ -975,10 +985,6 @@ class AgendaResolveButtonHandler {
         if (!"miscount".equalsIgnoreCase(agID) && !"absol_miscount".equalsIgnoreCase(agID)) {
             MessageHelper.sendMessageToChannel(event.getChannel(), resMes);
             MessageHelper.sendMessageToChannelWithButtons(event.getChannel(), voteMessage, buttons);
-            if ("action_deck_2".equals(game.getAcDeckID()) && aCount > 2) {
-                String acd2Shenanigans = getAcd2Shenanigans(game);
-                MessageHelper.sendMessageToChannel(game.getMainGameChannel(), acd2Shenanigans);
-            }
         } else {
             game.removeLaw(winner);
             game.putAgendaBackIntoDeckOnTop(winner);
@@ -986,12 +992,5 @@ class AgendaResolveButtonHandler {
         }
 
         ButtonHelper.deleteMessage(event);
-    }
-
-    private static String getAcd2Shenanigans(Game game) {
-        if (game.isACInDiscard("Last Minute Deliberation")) {
-            return "This is the window for *Last Minute Deliberation*! " + game.getPing();
-        }
-        return "*Last Minute Deliberation* is in the discard pile. Feel free to move forward.";
     }
 }

@@ -10,12 +10,15 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.apache.commons.lang3.StringUtils;
 import ti4.helpers.Emojis;
+import ti4.image.Mapper;
 import ti4.model.Source.ComponentSource;
 
 @Data
 public class PromissoryNoteModel implements ColorableModelInterface<PromissoryNoteModel>, EmbeddableModel {
     private String alias;
     private String name;
+    private String shortName;
+    private Boolean shrinkName;
     private String faction;
     private String color;
     private Boolean playArea;
@@ -41,6 +44,8 @@ public class PromissoryNoteModel implements ColorableModelInterface<PromissoryNo
         PromissoryNoteModel pn = new PromissoryNoteModel();
         pn.setAlias(this.alias.replaceAll("<color>", newColor.getName()));
         pn.setName(this.name);
+        pn.setShortName(this.shortName);
+        pn.setShrinkName(this.shrinkName);
         pn.setFaction(this.faction);
         pn.setColor(newColor.getName());
         pn.setPlayArea(this.playArea);
@@ -60,6 +65,22 @@ public class PromissoryNoteModel implements ColorableModelInterface<PromissoryNo
             && (faction != null || color != null)
             && text != null
             && source != null;
+    }
+
+    public String getShortName() {
+        if (getHomebrewReplacesID().isEmpty())
+        {
+            return Optional.ofNullable(shortName).orElse(getName());
+        }
+        return Optional.ofNullable(shortName).orElse(Mapper.getPromissoryNote(getHomebrewReplacesID().get()).getShortName());
+    }
+
+    public boolean getShrinkName() {
+        if (getHomebrewReplacesID().isEmpty())
+        {
+            return Optional.ofNullable(shrinkName).orElse(false);
+        }
+        return Optional.ofNullable(shrinkName).orElse(Mapper.getPromissoryNote(getHomebrewReplacesID().get()).getShrinkName());
     }
 
     public Optional<String> getFaction() {

@@ -6,6 +6,7 @@ import ti4.map.Game;
 import ti4.map.GameManager;
 import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
+import ti4.service.SusSlashCommandService;
 
 class CommandGameState {
 
@@ -25,17 +26,21 @@ class CommandGameState {
             throw new IllegalArgumentException("Invalid game name: " + gameName + " while attempting to run event " + event.getName() +
                     " in channel " + event.getChannel().getName());
         }
-        game.set(GameManager.getGame(gameName));
+        Game game = GameManager.getGame(gameName);
+        this.game.set(game);
+        game.incrementSpecificSlashCommandCount(event.getFullCommandName()); // TODO: This only works for commands that save...
+
+        SusSlashCommandService.checkIfShouldReportSusSlashCommand(event, game);
 
         if (!isPlayerCommand) {
             return;
         }
-        var gamePlayer = CommandHelper.getPlayerFromEvent(getGame(), event);
-        if (gamePlayer == null) {
+        var player = CommandHelper.getPlayerFromEvent(game, event);
+        if (player == null) {
             throw new IllegalArgumentException("Unable to determine player while attempting to run event " + event.getName() +
                     " in channel " + event.getChannel().getName() + " for game " + gameName);
         }
-        player.set(gamePlayer);
+        this.player.set(player);
     }
 
     public void postExecute(SlashCommandInteractionEvent event) {

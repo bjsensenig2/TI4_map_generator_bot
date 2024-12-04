@@ -20,6 +20,9 @@ public class Constants {
     public static final String sigmaId = "214326507458396161";
     public static final List<String> honoraryJazz = Arrays.asList("1153503280706625606", tspId);
 
+    // Server IDs
+    public static final String ASYNCTI4_HUB_SERVER_ID = "943410040369479690";
+
     public static String jazzPing() {
         User jazz = AsyncTI4DiscordBot.jda.getUserById(jazzId);
         return jazz == null ? "" : jazz.getAsMention();
@@ -794,6 +797,7 @@ public class Constants {
 
     public static final String TECH_ADD = "add";
     public static final String TECH_REMOVE = "remove";
+    public static final String TECH_PURGE = "purge";
     public static final String TECH_EXHAUST = "exhaust";
     public static final String TECH_REFRESH = "ready";
 
@@ -1191,4 +1195,6 @@ public class Constants {
     public static final String FOW_GM_IDS = "fogOfWarGMIDs";
     public static final String STARTED_DATE = "started_date";
     public static final String MODIFY_UNITS = "modify_units";
+    public static final String SHOW_OWNED_PNS_IN_PLAYER_AREA = "show_owned_pns_in_player_area";
+    public static final String SECONDS = "seconds";
 }

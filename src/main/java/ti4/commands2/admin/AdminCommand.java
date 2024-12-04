@@ -16,12 +16,12 @@ public class AdminCommand implements ParentCommand {
     private final Map<String, Subcommand> subcommands = Stream.of(
                     new DeleteGame(),
                     new ResetEmojiCache(),
+                    new DisableBot(),
                     new ReloadMap(),
                     new ReloadMapperObjects(),
                     new RestoreGame(),
                     new CardsInfoForPlayer(),
-                    new UpdateThreadArchiveTime(),
-                    new UploadStatistics())
+                    new UpdateThreadArchiveTime())
             .collect(Collectors.toMap(Subcommand::getName, subcommand -> subcommand));
 
     @Override

@@ -2,7 +2,6 @@ package ti4.helpers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -392,7 +391,7 @@ public class ButtonHelperModifyUnits {
             ButtonHelperFactionSpecific.offerMahactInfButtons(player, game);
         }
         if (player.hasInf2Tech() && unitName.toLowerCase().contains("inf")) {
-            ButtonHelper.resolveInfantryDeath(game, player, min);
+            ButtonHelper.resolveInfantryDeath(player, min);
         }
     }
 
@@ -803,13 +802,6 @@ public class ButtonHelperModifyUnits {
         String skilledS = "";
         if (skilled) {
             skilledS = "_skilled";
-        }
-        HashSet<String> adjTiles = new HashSet<>(FoWHelper.getAdjacentTilesAndNotThisTile(game, pos1, player, false));
-        if (game.playerHasLeaderUnlockedOrAlliance(player, "nokarcommander")) {
-            Tile hs = player.getHomeSystemTile();
-            if (hs != null) {
-                adjTiles.addAll(FoWHelper.getAdjacentTilesAndNotThisTile(game, hs.getPosition(), player, false));
-            }
         }
         for (String pos2 : FoWHelper.getAdjacentTiles(game, pos1, player, false)) {
             Tile tile = game.getTileByPosition(pos2);
@@ -1245,6 +1237,9 @@ public class ButtonHelperModifyUnits {
         event.getMessage().delete().queue();
     }
 
+    /**
+     * Known sources: {@link Helper#getPlanetPlaceUnitButtons}
+     */
     @ButtonHandler("place_")
     public static void genericPlaceUnit(String buttonID, ButtonInteractionEvent event, Game game, Player player) {
         String unitNPlanet = buttonID.replace("place_", "");
@@ -1289,6 +1284,14 @@ public class ButtonHelperModifyUnits {
                     game, player.getColor(), unitLong + " " + planetName);
                 successMessage = "Placed 1 " + Emojis.pds + " on "
                     + Helper.getPlanetRepresentation(planetName, game) + ".";
+            }
+        } else if ("monument".equalsIgnoreCase(unitLong)) {
+            if (player.ownsUnit("empyrean_monument")) {
+                AddUnitService.addUnits(event, game.getTile(AliasHandler.resolveTile(planetName)), game, player.getColor(), unitID);
+                successMessage = "Placed 1 " + Emojis.Monument + " in the space area of the " + Helper.getPlanetRepresentation(planetName, game) + " system.";
+            } else {
+                AddUnitService.addUnits(event, game.getTile(AliasHandler.resolveTile(planetName)), game, player.getColor(), unitLong + " " + planetName);
+                successMessage = "Placed 1 " + Emojis.Monument + " on " + Helper.getPlanetRepresentation(planetName, game) + ".";
             }
         } else {
             Tile tile;
@@ -1388,13 +1391,11 @@ public class ButtonHelperModifyUnits {
 
             }
         }
-        if (("sd".equalsIgnoreCase(unitID) || "pds".equalsIgnoreCase(unitLong)) && event.getMessage().getContentRaw().contains("for construction")) {
-
+        if (("sd".equalsIgnoreCase(unitID) || "pds".equalsIgnoreCase(unitLong) || "monument".equalsIgnoreCase(unitLong)) && event.getMessage().getContentRaw().contains("for construction")) {
             if (game.isFowMode() || (!"action".equalsIgnoreCase(game.getPhaseOfGame()) && !"statusScoring".equalsIgnoreCase(game.getPhaseOfGame()))) {
                 MessageHelper.sendMessageToChannel(player.getCorrectChannel(), playerRep + " " + successMessage);
             } else {
-                ButtonHelper.sendMessageToRightStratThread(player, game, playerRep + " " + successMessage,
-                    "construction");
+                ButtonHelper.sendMessageToRightStratThread(player, game, playerRep + " " + successMessage, "construction");
             }
 
             if (player.hasLeader("mahactagent") || player.hasExternalAccessToLeader("mahactagent")) {
@@ -1441,7 +1442,7 @@ public class ButtonHelperModifyUnits {
             }
             event.getMessage().delete().queue();
         } else {
-            if ("sd".equalsIgnoreCase(unitID) || "pds".equalsIgnoreCase(unitLong)) {
+            if ("sd".equalsIgnoreCase(unitID) || "pds".equalsIgnoreCase(unitLong) || "monument".equalsIgnoreCase(unitLong)) {
                 String producedInput = unitID + "_"
                     + game.getTile(AliasHandler.resolveTile(planetName)).getPosition() + "_"
                     + planetName;
@@ -1957,7 +1958,7 @@ public class ButtonHelperModifyUnits {
         Tile tile = game.getTileByPosition(game.getActiveSystem());
         int numff = Integer.parseInt(buttonID.split("_")[1]);
         if (numff > 0) {
-            RemoveUnitService.removeUnits(event, tile, game, player.getColor(),  numff + " infantry");
+            RemoveUnitService.removeUnits(event, tile, game, player.getColor(), numff + " infantry");
             AddUnitService.addUnits(event, tile, game, player.getColor(), numff + " fighters");
         }
         List<Button> systemButtons = ButtonHelper.moveAndGetLandingTroopsButtons(player, game, event);
@@ -2045,7 +2046,7 @@ public class ButtonHelperModifyUnits {
                                 ButtonHelperFactionSpecific.offerMahactInfButtons(player, game);
                             }
                             if (player.hasInf2Tech() && unitName.toLowerCase().contains("inf")) {
-                                ButtonHelper.resolveInfantryDeath(game, player, amount);
+                                ButtonHelper.resolveInfantryDeath(player, amount);
                             }
                             if (unitKey.getUnitType() == UnitType.Mech && player.hasTech("sar")) {
                                 for (int x = 0; x < amount; x++) {
@@ -2189,7 +2190,7 @@ public class ButtonHelperModifyUnits {
                 ButtonHelperFactionSpecific.offerMahactInfButtons(player, game);
             }
             if (player.hasInf2Tech() && unitName.toLowerCase().contains("inf")) {
-                ButtonHelper.resolveInfantryDeath(game, player, amount);
+                ButtonHelper.resolveInfantryDeath(player, amount);
             }
         }
 

@@ -13,17 +13,15 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.utils.FileUpload;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import ti4.ResourceHelper;
@@ -33,9 +31,9 @@ import ti4.helpers.Constants;
 import ti4.helpers.DisplayType;
 import ti4.helpers.FoWHelper;
 import ti4.helpers.Helper;
+import ti4.helpers.RandomHelper;
 import ti4.helpers.Storage;
 import ti4.helpers.Units;
-import ti4.helpers.Units.UnitKey;
 import ti4.map.Game;
 import ti4.map.Planet;
 import ti4.map.Player;
@@ -52,7 +50,6 @@ public class TileGenerator {
     private static final int TILE_PADDING = 100;
     private static final Point TILE_POSITION_POINT = new Point(255, 295);
     private static final Point LABEL_POSITION_POINT = new Point(90, 295);
-    private static final Point NUMBER_POSITION_POINT = new Point(40, 27);
     private static final BasicStroke stroke4 = new BasicStroke(4.0f);
     private static final BasicStroke stroke6 = new BasicStroke(6.0f);
     private static final BasicStroke stroke7 = new BasicStroke(7.0f);
@@ -113,8 +110,8 @@ public class TileGenerator {
                     tilesToDisplay.put(key, fowPlayer.buildFogTile(key, fowPlayer));
                 }
             }
-       }
-      
+        }
+
         int width = TILE_WIDTH + (TILE_EXTRA_WIDTH * 2 * context) + EXTRA_X;
         int height = TILE_HEIGHT * (2 * context + 1) + EXTRA_Y;
         var mainImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -410,7 +407,8 @@ public class TileGenerator {
                     if (unitHolder != spaceUnitHolder) {
                         addPlanetToken(tile, tileGraphics, unitHolder, rectangles);
                     }
-                    addUnits(tile, tileGraphics, rectangles, degree, degreeChange, unitHolder, radius, fowPlayer);
+                    new UnitRenderGenerator(
+                        game, displayType, tile, tileGraphics, rectangles, degree, degreeChange, unitHolder, radius, fowPlayer).render();
                 }
             }
             case Distance -> {
@@ -528,7 +526,7 @@ public class TileGenerator {
                 } else {
                     x += (isSpiral ? 36 : 0);
                     y += (isSpiral ? 43 : 0);
-                    String batFile = ResourceHelper.getInstance().getGeneralFile("zobat" + (ThreadLocalRandom.current().nextInt(4096) == 0 ? "_shiny" : "") + ".png");
+                    String batFile = ResourceHelper.getInstance().getGeneralFile("zobat" + (RandomHelper.isOneInX(4096) ? "_shiny" : "") + ".png");
                     BufferedImage bufferedImage = ImageHelper.read(batFile);
                     x += (345 - bufferedImage.getWidth()) / 2;
                     y += (300 - bufferedImage.getHeight()) / 2;
@@ -663,7 +661,7 @@ public class TileGenerator {
                     int mod = (game.playerHasLeaderUnlockedOrAlliance(player, "kolumecommander") ? 1 : 0);
 
                     if (player.hasAbility("starfall_gunnery")) {
-                        for (int i = ButtonHelper.checkNumberNonFighterShipsWithoutSpaceCannon(player, game, tile); i > 0; i--) {
+                        for (int i = ButtonHelper.checkNumberNonFighterShipsWithoutSpaceCannon(player, tile); i > 0; i--) {
                             diceCount.add(8 - mod);
                         }
                     }
@@ -759,8 +757,8 @@ public class TileGenerator {
                         }
                     };
 
-                    x += (345 - 73 * scale) / 2;
-                    y += (300 - pdsDice.size() * 48 * scale) / 2;
+                    x += (int) ((345 - 73 * scale) / 2);
+                    y += (int) ((300 - pdsDice.size() * 48 * scale) / 2);
                     for (Player player : pdsDice.keySet()) {
                         int numberOfDice = pdsDice.get(player).size();
                         boolean rerolls = game.playerHasLeaderUnlockedOrAlliance(player, "jolnarcommander");
@@ -805,7 +803,7 @@ public class TileGenerator {
                                 new Rectangle(Math.round(x + 73 * scale / 2), y, Math.round(73 * scale / 2), Math.round(48 * scale)),
                                 smallFont);
                         }
-                        y += 48 * scale;
+                        y += (int) (48 * scale);
                     }
                 }
             }
@@ -827,13 +825,13 @@ public class TileGenerator {
                 for (Planet planet : tile.getPlanetUnitHolders()) {
                     String traitFile = "";
                     List<String> traits = planet.getPlanetType();
-                    if (traits.isEmpty()) {
+                    if (traits.isEmpty() && StringUtils.isNotBlank(planet.getOriginalPlanetType())) {
                         traits.add(planet.getOriginalPlanetType());
                     }
 
                     if (tile.isMecatol()) {
                         traitFile = ResourceHelper.getInstance().getFactionFile("agenda.png");
-                    } else if (planet.getOriginalPlanetType().equals("faction")) {
+                    } else if ("faction".equalsIgnoreCase(planet.getOriginalPlanetType())) {
                         traitFile = ResourceHelper.getInstance().getFactionFile(Mapper.getPlanet(planet.getName()).getFactionHomeworld() + ".png");
                     } else if (traits.size() == 1) {
                         String t = planet.getPlanetType().getFirst();
@@ -917,7 +915,8 @@ public class TileGenerator {
                 boolean anySkips = false;
                 for (Planet planet : tile.getPlanetUnitHolders()) {
                     List<String> skips = planet.getTechSpeciality();
-                    if (!skips.contains(planet.getOriginalTechSpeciality())) {
+                    String originalTechSpeciality = planet.getOriginalTechSpeciality();
+                    if (StringUtils.isNotBlank(originalTechSpeciality) && !skips.contains(originalTechSpeciality)) {
                         skips.add(planet.getOriginalTechSpeciality());
                     }
                     skips.removeAll(Collections.singleton(null));
@@ -1251,8 +1250,7 @@ public class TileGenerator {
         }
     }
 
-    private static void addSleeperToken(Tile tile, Graphics tileGraphics, UnitHolder unitHolder,
-        Function<String, Boolean> isValid, Game game) {
+    private static void addSleeperToken(Tile tile, Graphics tileGraphics, UnitHolder unitHolder, Function<String, Boolean> isValid, Game game) {
         BufferedImage tokenImage;
         Point centerPosition = unitHolder.getHolderCenterPosition();
         if (unitHolder.getName().equalsIgnoreCase("mirage") && (tile.getPlanetUnitHolders().size() == 3 + 1)) {
@@ -1262,7 +1260,7 @@ public class TileGenerator {
         List<String> tokenList = new ArrayList<>(unitHolder.getTokenList());
         tokenList.remove(null);
         tokenList.sort((o1, o2) -> {
-            if ((o1.contains(Constants.SLEEPER) || o2.contains(Constants.SLEEPER))) {
+            if (o1.contains(Constants.SLEEPER) || o2.contains(Constants.SLEEPER)) {
                 return -1;
             } else if (o1.contains(Constants.DMZ_LARGE) || o2.contains(Constants.DMZ_LARGE)) {
                 return 1;
@@ -1270,7 +1268,7 @@ public class TileGenerator {
             return o1.compareTo(o2);
         });
         if (game.isShowBubbles() && unitHolder instanceof Planet planetHolder && shouldPlanetHaveShield(unitHolder, game)) {
-            String tokenPath = switch (planetHolder.getContrastColor()) {
+            String tokenPath = switch (StringUtils.defaultString(planetHolder.getContrastColor())) {
                 case "orange" -> ResourceHelper.getInstance().getTokenFile("token_planetaryShield_orange.png");
                 default -> ResourceHelper.getInstance().getTokenFile("token_planetaryShield.png");
             };
@@ -1587,347 +1585,6 @@ public class TileGenerator {
                 }
             }
         }
-    }
-
-    private String getUnitPath(UnitKey unit) {
-        return allEyesOnMe ? ResourceHelper.getInstance().getUnitFile(unit, allEyesOnMe) : ResourceHelper.getInstance().getUnitFile(unit);
-    }
-
-    private void addUnits(Tile tile, Graphics tileGraphics, List<Rectangle> rectangles, int degree, int degreeChange, UnitHolder unitHolder, int radius, Player fowPlayer) {
-        BufferedImage unitImage;
-        Map<Units.UnitKey, Integer> tempUnits = new HashMap<>(unitHolder.getUnits());
-        Map<Units.UnitKey, Integer> units = new LinkedHashMap<>();
-        HashMap<String, Point> unitOffset = new HashMap<>();
-        boolean isSpace = unitHolder.getName().equals(Constants.SPACE);
-        if (isSpace && displayType == DisplayType.shipless) {
-            return;
-        }
-
-        float mirageDragRatio = 2.0f / 3;
-        int mirageDragX = Math.round(((float) 345 / 8 + TILE_PADDING) * (1 - mirageDragRatio));
-        int mirageDragY = Math.round(((float) (3 * 300) / 4 + TILE_PADDING) * (1 - mirageDragRatio));
-        boolean hasMirage = false;
-        if (isSpace) {
-            Set<String> tokenList = unitHolder.getTokenList();
-            hasMirage = tokenList.stream().anyMatch(tok -> tok.contains("mirage"))
-                && (tile.getPlanetUnitHolders().size() != 3 + 1);
-        }
-
-        boolean isCabalJail = "s11".equals(tile.getTileID());
-        boolean isNekroJail = "s12".equals(tile.getTileID());
-        boolean isYssarilJail = "s13".equals(tile.getTileID());
-
-        boolean isJail = isCabalJail || isNekroJail || isYssarilJail;
-        boolean showJail = fowPlayer == null
-            || (isCabalJail && FoWHelper.canSeeStatsOfFaction(game, "cabal", fowPlayer))
-            || (isNekroJail && FoWHelper.canSeeStatsOfFaction(game, "nekro", fowPlayer))
-            || (isYssarilJail && FoWHelper.canSeeStatsOfFaction(game, "yssaril", fowPlayer));
-
-        Point unitOffsetValue = game.isAllianceMode() ? PositionMapper.getAllianceUnitOffset()
-            : PositionMapper.getUnitOffset();
-        int spaceX = unitOffsetValue != null ? unitOffsetValue.x : 10;
-        int spaceY = unitOffsetValue != null ? unitOffsetValue.y : -7;
-        for (Map.Entry<Units.UnitKey, Integer> entry : tempUnits.entrySet()) {
-            Units.UnitKey id = entry.getKey();
-            if (id != null && id.getUnitType() == Units.UnitType.Mech) {
-                units.put(id, entry.getValue());
-            }
-        }
-        for (Units.UnitKey key : units.keySet()) {
-            tempUnits.remove(key);
-        }
-        units.putAll(tempUnits);
-        Map<Units.UnitKey, Integer> unitDamage = unitHolder.getUnitDamage();
-        // float scaleOfUnit = 1.0f;
-        UnitTokenPosition unitTokenPosition = PositionMapper.getPlanetTokenPosition(unitHolder.getName());
-        if (unitTokenPosition == null) {
-            unitTokenPosition = PositionMapper.getSpaceUnitPosition(unitHolder.getName(), tile.getTileID());
-        }
-        BufferedImage dmgImage = ImageHelper.readScaled(Helper.getDamagePath(), 0.8f);
-
-        boolean isMirage = unitHolder.getName().equals(Constants.MIRAGE);
-        int multInf = 2;
-        int multFF = 2;
-        for (Map.Entry<Units.UnitKey, Integer> unitEntry : units.entrySet()) {
-            Units.UnitKey unitKey = unitEntry.getKey();
-            if (unitKey != null && !Mapper.isValidColor(unitKey.getColor())) {
-                continue;
-            }
-            Integer unitCount = unitEntry.getValue();
-
-            if (isJail && fowPlayer != null) {
-                String colorID = Mapper.getColorID(fowPlayer.getColor());
-                if (!showJail && !unitKey.getColorID().equals(colorID)) {
-                    continue;
-                }
-            }
-
-            Integer unitDamageCount = unitDamage.get(unitKey);
-
-            Integer bulkUnitCount = null;
-            Color groupUnitColor = switch (Mapper.getColor(unitKey.getColorID()).getTextColor()) {
-                case "black" -> Color.BLACK;
-                default -> Color.WHITE;
-            };
-
-            try {
-                String unitPath = getUnitPath(unitKey);
-                if (unitPath != null) {
-                    if (unitKey.getUnitType() == Units.UnitType.Fighter) {
-                        unitPath = unitPath.replace(Constants.COLOR_FF, Constants.BULK_FF);
-                        bulkUnitCount = unitCount;
-                    } else if (unitKey.getUnitType() == Units.UnitType.Infantry) {
-                        unitPath = unitPath.replace(Constants.COLOR_GF, Constants.BULK_GF);
-                        bulkUnitCount = unitCount;
-                    }
-                }
-                if (game.getPlayerByColorID(unitKey.getColorID()).orElse(null) != null) {
-                    Player p = game.getPlayerByColorID(unitKey.getColorID()).get();
-                    if (unitKey.getUnitType() == Units.UnitType.Spacedock && p.ownsUnitSubstring("cabal_spacedock")) {
-                        unitPath = unitPath.replace("sd", "csd");
-                    }
-                    if (unitKey.getUnitType() == Units.UnitType.Lady) {
-                        unitPath = unitPath.replace("lady", "fs");
-                    }
-                    if (unitKey.getUnitType() == Units.UnitType.Cavalry) {
-                        String name = "Memoria_1.png";
-                        if (game.getPNOwner("cavalry") != null && game.getPNOwner("cavalry").hasTech("m2")) {
-                            name = "Memoria_2.png";
-                        }
-                        unitPath = ResourceHelper.getInstance().getUnitFile(name);
-                    }
-                }
-
-                unitImage = ImageHelper.read(unitPath);
-                if (bulkUnitCount != null && bulkUnitCount > 9) {
-                    unitImage = ImageHelper.readScaled(unitPath, 1.2f);
-                }
-            } catch (Exception e) {
-                BotLogger.log("Could not parse unit file for: " + unitKey + " in game " + game.getName(), e);
-                continue;
-            }
-            if (unitImage == null)
-                continue;
-
-            if (bulkUnitCount != null && bulkUnitCount > 0) {
-                unitCount = 1;
-
-            }
-
-            BufferedImage spoopy = null;
-            if ((unitKey.getUnitType() == Units.UnitType.Warsun) && (ThreadLocalRandom.current().nextInt(1000) == 0)) {
-                String spoopyPath = ResourceHelper.getInstance().getSpoopyFile();
-                spoopy = ImageHelper.read(spoopyPath);
-            }
-
-            if (unitKey.getUnitType() == Units.UnitType.Lady) {
-                String name = "units_ds_ghemina_lady_wht.png";
-                String spoopyPath = ResourceHelper.getInstance().getDecalFile(name);
-                spoopy = ImageHelper.read(spoopyPath);
-            }
-            Player player = game.getPlayerFromColorOrFaction(unitKey.getColor());
-            if (unitKey.getUnitType() == Units.UnitType.Flagship && player.ownsUnit("ghemina_flagship_lord")) {
-                String name = "units_ds_ghemina_lord_wht.png";
-                String spoopyPath = ResourceHelper.getInstance().getDecalFile(name);
-                spoopy = ImageHelper.read(spoopyPath);
-            }
-            Point centerPosition = unitHolder.getHolderCenterPosition();
-            // DRAW UNITS
-            for (int i = 0; i < unitCount; i++) {
-                String id = unitKey.asyncID();
-                boolean fighterOrInfantry = Set.of(Units.UnitType.Infantry, Units.UnitType.Fighter).contains(unitKey.getUnitType());
-                Point position = unitTokenPosition.getPosition(fighterOrInfantry ? "tkn_" + id : id);
-                if (isSpace && position != null && !fighterOrInfantry) {
-                    Point point = unitOffset.get(id);
-                    if (point == null) {
-                        point = new Point(0, 0);
-                    }
-                    position.x = position.x + point.x;
-                    position.y = position.y + point.y;
-                    point.x += spaceX;
-                    point.y += spaceY;
-                    unitOffset.put(id, point);
-                }
-                boolean searchPosition = true;
-                int x = 0;
-                int y = 0;
-                int mult = 0;
-                if (fighterOrInfantry && isSpace) {
-                    if (unitKey.getUnitType() == Units.UnitType.Infantry) {
-                        multInf--;
-                        mult = multInf;
-                    } else {
-                        multFF--;
-                        mult = multFF;
-                    }
-                    if (mult < 0) {
-                        UnitTokenPosition unitTokenPosition2 = PositionMapper.getSpaceUnitPosition(unitHolder.getName(), tile.getTileID());
-                        int x2 = (int) centerPosition.getX() - 19;
-                        int y2 = (int) centerPosition.getY() - 15;
-                        if (unitTokenPosition2 != null) {
-                            Point position2 = unitTokenPosition2.getPosition(fighterOrInfantry ? "tkn_" + id : id);
-                            x2 = (int) position2.getX();
-                            y2 = (int) position2.getY();
-                        }
-                        position = new Point(x2 + 30 * (mult - 1), y2);
-                    }
-                }
-                if (unitKey.getUnitType() == Units.UnitType.Infantry && position == null) {
-                    UnitTokenPosition unitTokenPosition2 = PositionMapper.getPlanetTokenPosition(unitHolder.getName());
-                    if (unitTokenPosition2 == null) {
-                        unitTokenPosition2 = PositionMapper.getSpaceUnitPosition(unitHolder.getName(), tile.getTileID());
-                    }
-                    int x2 = (int) centerPosition.getX() - 19;
-                    int y2 = (int) centerPosition.getY() - 15;
-                    if (unitTokenPosition2 != null) {
-                        Point position2 = unitTokenPosition2.getPosition(fighterOrInfantry ? "tkn_" + id : id);
-                        x2 = (int) position2.getX();
-                        y2 = (int) position2.getY();
-                    }
-                    position = new Point(x2 - 33 * multInf, y2);
-                    multInf = multInf + 1;
-                }
-                while (searchPosition && position == null) {
-                    x = (int) (radius * Math.sin(degree));
-                    y = (int) (radius * Math.cos(degree));
-                    int possibleX = centerPosition.x + x - (unitImage.getWidth() / 2);
-                    int possibleY = centerPosition.y + y - (unitImage.getHeight() / 2);
-                    BufferedImage finalImage = unitImage;
-                    if (rectangles.stream().noneMatch(rectangle -> rectangle.intersects(possibleX, possibleY,
-                        finalImage.getWidth(), finalImage.getHeight()))) {
-                        searchPosition = false;
-                    } else if (degree > 360) {
-                        searchPosition = false;
-                        degree += 3;// To change degree if we did not find place, might be better placement then
-                    }
-                    degree += degreeChange;
-                    if (!searchPosition) {
-                        rectangles.add(
-                            new Rectangle(possibleX, possibleY, finalImage.getWidth(), finalImage.getHeight()));
-                    }
-                }
-
-                int xOriginal = centerPosition.x + x;
-                int yOriginal = centerPosition.y + y;
-                int imageX = position != null ? position.x : xOriginal - (unitImage.getWidth() / 2);
-                imageX += TILE_PADDING;
-                int imageY = position != null ? position.y : yOriginal - (unitImage.getHeight() / 2);
-                imageY += TILE_PADDING;
-                if (isMirage) {
-                    if (tile.getPlanetUnitHolders().size() == 3 + 1) {
-                        imageX += Constants.MIRAGE_TRIPLE_POSITION.x;
-                        imageY += Constants.MIRAGE_TRIPLE_POSITION.y;
-                    } else {
-                        imageX += Constants.MIRAGE_POSITION.x;
-                        imageY += Constants.MIRAGE_POSITION.y;
-                    }
-                } else if (hasMirage) {
-                    imageX += (unitImage.getWidth() / 2);
-                    imageY += (unitImage.getHeight() / 2);
-                    imageX = Math.round(mirageDragRatio * imageX) + mirageDragX + (fighterOrInfantry ? 60 : 0);
-                    imageY = Math.round(mirageDragRatio * imageY) + mirageDragY;
-                    imageX -= (unitImage.getWidth() / 2);
-                    imageY -= (unitImage.getHeight() / 2);
-                }
-
-                tileGraphics.drawImage(unitImage, imageX, imageY, null);
-                if (unitKey.getUnitType() == Units.UnitType.Mech && (ButtonHelper.isLawInPlay(game, "articles_war") || ButtonHelper.isLawInPlay(game, "absol_articleswar"))) {
-                    BufferedImage mechTearImage = ImageHelper.read(ResourceHelper.getInstance().getTokenFile("agenda_articles_of_war" + DrawingUtil.getBlackWhiteFileSuffix(unitKey.getColorID())));
-                    tileGraphics.drawImage(mechTearImage, imageX, imageY, null);
-                } else if (unitKey.getUnitType() == Units.UnitType.Warsun && ButtonHelper.isLawInPlay(game, "schematics")) {
-                    BufferedImage wsCrackImage = ImageHelper.read(ResourceHelper.getInstance().getTokenFile("agenda_publicize_weapon_schematics" + DrawingUtil.getBlackWhiteFileSuffix(unitKey.getColorID())));
-                    tileGraphics.drawImage(wsCrackImage, imageX, imageY, null);
-                }
-
-                Optional<BufferedImage> decal = Optional.ofNullable(player)
-                    .map(p -> p.getDecalFile(unitKey.asyncID()))
-                    .map(decalFileName -> ImageHelper.read(ResourceHelper.getInstance().getDecalFile(decalFileName)));
-
-                if (decal.isPresent() && !List.of(Units.UnitType.Fighter, Units.UnitType.Infantry).contains(unitKey.getUnitType())) {
-                    tileGraphics.drawImage(decal.get(), imageX, imageY, null);
-                }
-                if (spoopy != null) {
-                    tileGraphics.drawImage(spoopy, imageX, imageY, null);
-                }
-
-                // UNIT TAGS
-                if (i == 0 && !(Units.UnitType.Infantry.equals(unitKey.getUnitType())) && game.isShowUnitTags()) { // DRAW TAG
-                    UnitModel unitModel = game.getUnitFromUnitKey(unitKey);
-                    if (player != null && unitModel != null && unitModel.getIsShip()) {
-                        // TODO: Only paint the tag of the most expensive ship per player, or if no
-                        // ships, the "bottom most" unit on a planet
-                        String factionTag = player.getFactionModel().getShortTag();
-                        BufferedImage plaquette = ImageHelper
-                            .read(ResourceHelper.getInstance().getUnitFile("unittags_plaquette.png"));
-                        Point plaquetteOffset = getUnitTagLocation(id);
-
-                        tileGraphics.drawImage(plaquette, imageX + plaquetteOffset.x,
-                            imageY + plaquetteOffset.y, null);
-                        DrawingUtil.drawPlayerFactionIconImage(tileGraphics, player, imageX + plaquetteOffset.x,
-                            imageY + plaquetteOffset.y, 32, 32);
-
-                        tileGraphics.setColor(Color.WHITE);
-                        DrawingUtil.drawCenteredString(tileGraphics, factionTag,
-                            new Rectangle(imageX + plaquetteOffset.x + 25,
-                                imageY + plaquetteOffset.y + 17, 40, 13),
-                            Storage.getFont13());
-                    }
-                }
-                if (bulkUnitCount != null) {
-                    tileGraphics.setFont(Storage.getFont24());
-                    tileGraphics.setColor(groupUnitColor);
-
-                    int scaledNumberPositionX = NUMBER_POSITION_POINT.x;
-                    int scaledNumberPositionY = NUMBER_POSITION_POINT.y;
-                    if (bulkUnitCount > 9) {
-                        tileGraphics.setFont(Storage.getFont28());
-                        scaledNumberPositionX = scaledNumberPositionX + 5;
-                        scaledNumberPositionY = scaledNumberPositionY + 5;
-                    }
-                    tileGraphics.drawString(Integer.toString(bulkUnitCount),
-                        imageX + scaledNumberPositionX,
-                        imageY + scaledNumberPositionY);
-                }
-
-                if (unitDamageCount != null && unitDamageCount > 0 && dmgImage != null) {
-                    if (isSpace && position != null) {
-                        position.x = position.x - 7;
-                    }
-                    int imageDmgX = position != null
-                        ? position.x + (unitImage.getWidth() / 2) - (dmgImage.getWidth() / 2)
-                        : xOriginal - (dmgImage.getWidth() / 2);
-                    int imageDmgY = position != null
-                        ? position.y + (unitImage.getHeight() / 2) - (dmgImage.getHeight() / 2)
-                        : yOriginal - (dmgImage.getHeight() / 2);
-                    if (isMirage) {
-                        imageDmgX = imageX - TILE_PADDING;
-                        imageDmgY = imageY - TILE_PADDING;
-                    } else if (unitKey.getUnitType() == Units.UnitType.Mech) {
-                        imageDmgX = position != null ? position.x : xOriginal - (dmgImage.getWidth());
-                        imageDmgY = position != null ? position.y : yOriginal - (dmgImage.getHeight());
-
-                    }
-                    tileGraphics.drawImage(dmgImage, TILE_PADDING + imageDmgX, TILE_PADDING + imageDmgY, null);
-                    unitDamageCount--;
-                }
-            }
-        }
-    }
-
-    private static Point getUnitTagLocation(String unitID) {
-        return switch (unitID) {
-            case "ws" -> new Point(-10, 45); // War Sun
-            case "fs", "lord", "lady", "tyrantslament", "cavalry" -> new Point(10, 55); // Flagship
-            case "dn" -> new Point(10, 50); // Dreadnought
-            case "ca" -> new Point(0, 40); // Cruiser
-            case "cv" -> new Point(0, 40); // Carrier
-            case "gf", "ff" -> new Point(-15, 12); // Infantry/Fighter
-            case "dd" -> new Point(-10, 30); // Destroyer
-            case "mf" -> new Point(-10, 20); // Mech
-            case "pd" -> new Point(-10, 20); // PDS
-            case "sd", "csd", "plenaryorbital" -> new Point(-10, 20); // Space Dock
-            default -> new Point(0, 0);
-        };
     }
 
     private static void drawOnWormhole(Tile tile, Graphics graphics, BufferedImage icon, int offset) {

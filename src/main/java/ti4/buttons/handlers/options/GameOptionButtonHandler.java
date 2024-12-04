@@ -33,7 +33,19 @@ class GameOptionButtonHandler {
     }
 
     @ButtonHandler("offerGameOptionButtons")
-    public static void offerGameOptionButtons(MessageChannel channel) {
-        GameOptionService.offerGameOptionButtons(channel);
+    public static void offerGameOptionButtons(Game game, MessageChannel channel) {
+        GameOptionService.offerGameOptionButtons(game, channel);
+    }
+
+    @ButtonHandler("showOwnedPNsInPlayerArea_turnON")
+    public static void showOwnedPNsInPlayerArea_turnON(ButtonInteractionEvent event, Game game) {
+        game.setShowOwnedPNsInPlayerArea(true);
+        event.editButton(GameOptionService.showOwnedPNs_ON).queue();
+    }
+
+    @ButtonHandler("showOwnedPNsInPlayerArea_turnOFF")
+    public static void showOwnedPNsInPlayerArea_turnOFF(ButtonInteractionEvent event, Game game) {
+        game.setShowOwnedPNsInPlayerArea(false);
+        event.editButton(GameOptionService.showOwnedPNs_OFF).queue();
     }
 }

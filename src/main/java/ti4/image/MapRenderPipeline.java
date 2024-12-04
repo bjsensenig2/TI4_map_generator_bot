@@ -12,11 +12,13 @@ import net.dv8tion.jda.api.utils.FileUpload;
 import org.jetbrains.annotations.Nullable;
 import ti4.helpers.DisplayType;
 import ti4.helpers.GlobalSettings;
+import ti4.helpers.TimedRunnable;
 import ti4.map.Game;
 import ti4.message.BotLogger;
 
 public class MapRenderPipeline {
 
+    private static final int EXECUTION_TIME_SECONDS_WARNING_THRESHOLD = 10;
     private static final MapRenderPipeline instance = new MapRenderPipeline();
 
     private final BlockingQueue<RenderEvent> gameRenderQueue = new LinkedBlockingQueue<>();
@@ -58,17 +60,22 @@ public class MapRenderPipeline {
     }
 
     private static void render(RenderEvent renderEvent) {
-        try (var mapGenerator = new MapGenerator(renderEvent.game, renderEvent.displayType, renderEvent.event)) {
-            mapGenerator.draw();
-            if (renderEvent.uploadToDiscord) {
-                uploadToDiscord(mapGenerator, renderEvent.callback());
-            }
-            if (renderEvent.uploadToWebsite) {
-                mapGenerator.uploadToWebsite();
-            }
-        } catch (Exception e) {
-            BotLogger.log("Render event threw an exception. Game '" + renderEvent.game.getName() + "'", e);
-        }
+        var timedRunnable = new TimedRunnable("Render event task for " + renderEvent.game.getName(),
+                EXECUTION_TIME_SECONDS_WARNING_THRESHOLD,
+                () -> {
+                    try (var mapGenerator = new MapGenerator(renderEvent.game, renderEvent.displayType, renderEvent.event)) {
+                        mapGenerator.draw();
+                        if (renderEvent.uploadToDiscord) {
+                            uploadToDiscord(mapGenerator, renderEvent.callback());
+                        }
+                        if (renderEvent.uploadToWebsite) {
+                            mapGenerator.uploadToWebsite();
+                        }
+                    } catch (Exception e) {
+                        BotLogger.log("Render event threw an exception. Game '" + renderEvent.game.getName() + "'", e);
+                    }
+                });
+        timedRunnable.run();
     }
 
     private static void uploadToDiscord(MapGenerator mapGenerator, Consumer<FileUpload> callback) {
@@ -83,20 +90,20 @@ public class MapRenderPipeline {
 
     public static void renderToWebsiteOnly(Game game, @Nullable GenericInteractionCreateEvent event) {
         if (GlobalSettings.getSetting(GlobalSettings.ImplementedSettings.UPLOAD_DATA_TO_WEB_SERVER.toString(), Boolean.class, false)) {
-            render(game, event, null, null, false, true);
+            queue(game, event, null, null, false, true);
         }
     }
 
-    public static void render(Game game, @Nullable SlashCommandInteractionEvent event, @Nullable Consumer<FileUpload> callback) {
-        render(game, event, null, callback, true, true);
+    public static void queue(Game game, @Nullable SlashCommandInteractionEvent event, @Nullable Consumer<FileUpload> callback) {
+        queue(game, event, null, callback, true, true);
     }
 
-    public static void render(Game game, @Nullable GenericInteractionCreateEvent event, @Nullable DisplayType displayType,
+    public static void queue(Game game, @Nullable GenericInteractionCreateEvent event, @Nullable DisplayType displayType,
                        @Nullable Consumer<FileUpload> callback) {
-        render(game, event, displayType, callback, true, true);
+        queue(game, event, displayType, callback, true, true);
     }
 
-    public static void render(Game game, @Nullable GenericInteractionCreateEvent event,  @Nullable DisplayType displayType,
+    public static void queue(Game game, @Nullable GenericInteractionCreateEvent event,  @Nullable DisplayType displayType,
                        @Nullable Consumer<FileUpload> callback, boolean uploadToDiscord, boolean uploadToWebsite) {
         if (game == null) {
             throw new IllegalArgumentException("game cannot be null in render pipeline");

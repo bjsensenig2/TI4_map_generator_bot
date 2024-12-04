@@ -19,6 +19,7 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import ti4.AsyncTI4DiscordBot;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.Helper;
+import ti4.helpers.ThreadGetter;
 import ti4.map.Game;
 import ti4.map.GameManager;
 import ti4.map.Player;
@@ -27,16 +28,13 @@ import ti4.message.MessageHelper;
 
 public class UserJoinServerListener extends ListenerAdapter {
 
-    private static boolean validateEvent(GenericGuildEvent event) {
-        String eventGuild = event.getGuild().getId();
-        List<String> asyncGuilds = AsyncTI4DiscordBot.guilds.stream().map(Guild::getId).toList();
-        // Do not process these events in guilds that we aren't initialized in
-        return asyncGuilds.contains(eventGuild);
-    }
-
     @Override
     public void onGuildMemberJoin(@Nonnull GuildMemberJoinEvent event) {
         if (!validateEvent(event)) return;
+        AsyncTI4DiscordBot.runAsync("Guild member join task", () -> handleGuildMemberJoin(event));
+    }
+
+    private void handleGuildMemberJoin(GuildMemberJoinEvent event) {
         try {
             checkIfNewUserIsInExistingGamesAndAutoAddRole(event.getGuild(), event.getUser());
         } catch (Exception e) {
@@ -47,6 +45,10 @@ public class UserJoinServerListener extends ListenerAdapter {
     @Override
     public void onGuildMemberRemove(@Nonnull GuildMemberRemoveEvent event) {
         if (!validateEvent(event)) return;
+        AsyncTI4DiscordBot.runAsync("Guild member remove task", () -> handleGuildMemberRemove(event));
+    }
+
+    private void handleGuildMemberRemove(GuildMemberRemoveEvent event) {
         try {
             event.getGuild().retrieveAuditLogs().queueAfter(1, TimeUnit.SECONDS, (logs) -> {
                 boolean voluntary = true;
@@ -64,6 +66,16 @@ public class UserJoinServerListener extends ListenerAdapter {
         } catch (Exception e) {
             BotLogger.log("Error in `UserJoinServerListener.onGuildMemberRemove`", e);
         }
+    }
+
+    private static boolean validateEvent(GenericGuildEvent event) {
+        if (!AsyncTI4DiscordBot.isReadyToReceiveCommands()) {
+            return false;
+        }
+        String eventGuild = event.getGuild().getId();
+        List<String> asyncGuilds = AsyncTI4DiscordBot.guilds.stream().map(Guild::getId).toList();
+        // Do not process these events in guilds that we aren't initialized in
+        return asyncGuilds.contains(eventGuild);
     }
 
     private void checkIfNewUserIsInExistingGamesAndAutoAddRole(Guild guild, User user) {
@@ -163,18 +175,11 @@ public class UserJoinServerListener extends ListenerAdapter {
 
     private static void reportUserLeftServer(String message) {
         TextChannel bothelperLoungeChannel = AsyncTI4DiscordBot.guildPrimary.getTextChannelsByName("staff-lounge", true).stream().findFirst().orElse(null);
-        if (bothelperLoungeChannel == null)
-            return;
+        if (bothelperLoungeChannel == null) return;
         List<ThreadChannel> threadChannels = bothelperLoungeChannel.getThreadChannels();
-        if (threadChannels.isEmpty())
-            return;
+        if (threadChannels.isEmpty()) return;
         String threadName = "in-progress-games-left";
-        // SEARCH FOR EXISTING OPEN THREAD
-        for (ThreadChannel threadChannel_ : threadChannels) {
-            if (threadChannel_.getName().equals(threadName)) {
-                MessageHelper.sendMessageToChannel(threadChannel_, message);
-                return;
-            }
-        }
+        ThreadGetter.getThreadInChannel(bothelperLoungeChannel, threadName,
+            threadChannel -> MessageHelper.sendMessageToChannel(threadChannel, message));
     }
 }

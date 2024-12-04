@@ -2,7 +2,6 @@ package ti4.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
@@ -10,10 +9,11 @@ import org.apache.commons.lang3.StringUtils;
 import ti4.buttons.Buttons;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.map.Game;
-import ti4.map.GameManager;
-import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
 import ti4.message.MessageHelper;
+import ti4.users.UserSettingsManager;
+
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class PlayerPreferenceHelper {
 
@@ -33,12 +33,8 @@ public class PlayerPreferenceHelper {
     public static void resolvePlayerPref(Player player, ButtonInteractionEvent event, String buttonID, Game game) {
         String thing = buttonID.split("_")[1];
         switch (thing) {
-            case "autoSaboReact" -> {
-                offerSetAutoPassOnSaboButtons(game, player);
-            }
-            case "afkTimes" -> {
-                offerAFKTimeOptions(game, player);
-            }
+            case "autoSaboReact" -> offerSetAutoPassOnSaboButtons(game, player);
+            case "afkTimes" -> offerAFKTimeOptions(player);
             case "tacticalAction" -> {
                 List<Button> buttons = new ArrayList<>();
                 String msg = player.getRepresentation()
@@ -55,51 +51,23 @@ public class PlayerPreferenceHelper {
                 buttons.add(Buttons.green("playerPrefDecision_false_agenda", "Turn off"));
                 MessageHelper.sendMessageToChannel(player.getCardsInfoThread(), msg, buttons);
             }
-            case "directHitManagement" -> {
-                offerDirectHitManagementOptions(game, player);
-            }
+            case "directHitManagement" -> offerDirectHitManagementOptions(game, player);
         }
         ButtonHelper.deleteMessage(event);
     }
 
     @ButtonHandler("playerPrefDecision_")
-    public static void resolvePlayerPrefDecision(Player player, ButtonInteractionEvent event, String buttonID,
-        Game game) {
+    public static void resolvePlayerPrefDecision(Player player, ButtonInteractionEvent event, String buttonID) {
         String trueOrFalse = buttonID.split("_")[1];
         String distanceOrAgenda = buttonID.split("_")[2];
-        if ("true".equals(trueOrFalse)) {
-            if ("distance".equals(distanceOrAgenda)) {
-                player.setPreferenceForDistanceBasedTacticalActions(true);
-                Map<String, Game> mapList = GameManager.getGameNameToGame();
-                for (Game game2 : mapList.values()) {
-                    for (Player player2 : game2.getRealPlayers()) {
-                        if (player2.getUserID().equalsIgnoreCase(player.getUserID())) {
-                            player2.setPreferenceForDistanceBasedTacticalActions(true);
-                            GameSaveLoadManager.saveGame(game2, player2.getUserName() + " Updated Player Settings");
-                        }
-                    }
-                }
-            } else {
-                player.setAutoPassWhensAfters(true);
-            }
+        if ("distance".equals(distanceOrAgenda)) {
+            var userSettings = UserSettingsManager.get(player.getUserID());
+            userSettings.setPrefersDistanceBasedTacticalActions("true".equals(trueOrFalse));
+            UserSettingsManager.save(userSettings);
         } else {
-            if ("distance".equals(distanceOrAgenda)) {
-                player.setPreferenceForDistanceBasedTacticalActions(false);
-                Map<String, Game> mapList = GameManager.getGameNameToGame();
-                for (Game game2 : mapList.values()) {
-                    for (Player player2 : game2.getRealPlayers()) {
-                        if (player2.getUserID().equalsIgnoreCase(player.getUserID())) {
-                            player2.setPreferenceForDistanceBasedTacticalActions(false);
-                            GameSaveLoadManager.saveGame(game2, player2.getUserName() + " Updated Player Settings");
-                        }
-                    }
-                }
-            } else {
-                player.setAutoPassWhensAfters(false);
-            }
+            player.setAutoPassWhensAfters("true".equals(trueOrFalse));
         }
         MessageHelper.sendMessageToChannel(player.getCardsInfoThread(), "Set setting successfully");
-
         ButtonHelper.deleteMessage(event);
     }
 
@@ -141,15 +109,21 @@ public class PlayerPreferenceHelper {
         }
     }
 
-    public static void offerAFKTimeOptions(Game game, Player player) {
-        List<Button> buttons = getSetAFKButtons(game);
-        player.setHoursThatPlayerIsAFK("");
+    public static void offerAFKTimeOptions(Player player) {
+        List<Button> buttons = getSetAFKButtons();
+
+        var userSettings = UserSettingsManager.get(player.getUserID());
+        if (isNotBlank(userSettings.getAfkHours())) {
+            userSettings.setAfkHours(null);
+            UserSettingsManager.save(userSettings);
+        }
+
         MessageHelper.sendMessageToChannelWithButtons(player.getCardsInfoThread(), player.getRepresentationUnfogged()
             + " your afk times (if any) have been reset. Use buttons to select the hours (note they are in UTC) in which you're afk. If you select 8 for example, you will be set as AFK from 8:00 UTC to 8:59 UTC in every game you are in.",
             buttons);
     }
 
-    public static List<Button> getSetAFKButtons(Game game) {
+    public static List<Button> getSetAFKButtons() {
         List<Button> buttons = new ArrayList<>();
         for (int x = 0; x < 24; x++) {
             buttons.add(Buttons.gray("setHourAsAFK_" + x, "" + x));
@@ -224,22 +198,14 @@ public class PlayerPreferenceHelper {
     }
 
     @ButtonHandler("setHourAsAFK_")
-    public static void resolveSetAFKTime(Game gameOG, Player player, String buttonID, ButtonInteractionEvent event) {
+    public static void resolveSetAFKTime(Player player, String buttonID, ButtonInteractionEvent event) {
         String time = buttonID.split("_")[1];
-        player.addHourThatIsAFK(time);
+
+        var userSetting = UserSettingsManager.get(player.getUserID());
+        userSetting.addAfkHour(time);
+        UserSettingsManager.save(userSetting);
+
         ButtonHelper.deleteTheOneButton(event);
         MessageHelper.sendMessageToChannel(event.getMessageChannel(), player.getFactionEmoji() + " Set hour " + time + " as a time that you are afk");
-        Map<String, Game> mapList = GameManager.getGameNameToGame();
-        String afkTimes = player.getHoursThatPlayerIsAFK();
-        for (Game game : mapList.values()) {
-            if (!game.isHasEnded()) {
-                for (Player player2 : game.getRealPlayers()) {
-                    if (player2.getUserID().equalsIgnoreCase(player.getUserID())) {
-                        player2.setHoursThatPlayerIsAFK(afkTimes);
-                        GameSaveLoadManager.saveGame(game, player2.getUserName() + " Updated Player Settings");
-                    }
-                }
-            }
-        }
     }
 }

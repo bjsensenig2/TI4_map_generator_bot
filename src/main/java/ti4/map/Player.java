@@ -74,19 +74,20 @@ import ti4.service.turn.EndTurnService;
 import ti4.service.turn.StartTurnService;
 import ti4.users.UserSettingsManager;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 public class Player {
 
     private String userID;
     private String userName;
 
-    private String gameID;
+    private final Game game;
     private boolean tenMinReminderPing;
 
     private boolean passed;
     private boolean readyToPassBag;
     private boolean searchWarrant;
     private boolean isDummy;
-    private boolean prefersDistanceBasedTacticalActions;
     private boolean autoPassOnWhensAfters;
     private boolean eliminated;
 
@@ -102,7 +103,6 @@ public class Player {
     @Setter
     private String homeSystemPosition;
     private String allianceMembers = "";
-    private String hoursThatPlayerIsAFK = "";
     private String color;
 
     @Getter
@@ -225,19 +225,15 @@ public class Player {
 
     private final Tile nomboxTile = new Tile("nombox", "nombox");
 
-    public Player() {
-    }
-
-    public Player(@JsonProperty("userID") String userID, @JsonProperty("userName") String userName,
-        @JsonProperty("gameID") String gameID) {
+    public Player(String userID, String userName, Game game) {
         this.userID = userID;
         this.userName = userName;
-        this.gameID = gameID;
+        this.game = game;
     }
 
     @JsonIgnore
     public Game getGame() {
-        return GameManager.getGame(gameID);
+        return game;
     }
 
     @JsonIgnore
@@ -277,10 +273,6 @@ public class Player {
         spentThingsThisWindow = new ArrayList<>();
     }
 
-    public void resetBombardUnits() {
-        bombardUnits = new ArrayList<>();
-    }
-
     public Map<String, Integer> getCurrentProducedUnits() {
         return producedUnits;
     }
@@ -297,16 +289,8 @@ public class Player {
         spentThingsThisWindow.add(thing);
     }
 
-    public void addBombardUnit(String thing) {
-        bombardUnits.add(thing);
-    }
-
     public void removeSpentThing(String thing) {
         spentThingsThisWindow.remove(thing);
-    }
-
-    public void removeBombardUnit(String thing) {
-        bombardUnits.remove(thing);
     }
 
     public int getInitiative() {
@@ -329,10 +313,6 @@ public class Player {
             }
         }
         return 0;
-    }
-
-    public void resetTransactionItems() {
-        transactionItems = new ArrayList<>();
     }
 
     public List<String> getTransactionItems() {
@@ -378,11 +358,6 @@ public class Player {
         transactionItems.remove(thing);
     }
 
-    public void replaceTransactionItem(String thingToRemove, String thingToAdd) {
-        removeTransactionItem(thingToRemove);
-        addTransactionItem(thingToAdd);
-    }
-
     public void setTransactionItems(List<String> things) {
         transactionItems = things;
     }
@@ -420,29 +395,6 @@ public class Player {
 
     public void setBombardUnits(List<String> things) {
         bombardUnits = things;
-    }
-
-    public void fillUpBombardUnits(Tile tile) {
-        for (UnitHolder uH : tile.getUnitHolders().values()) {
-            Map<UnitKey, Integer> units = uH.getUnits();
-            for (UnitKey unit : units.keySet()) {
-                if (unitBelongsToPlayer(unit) && getUnitFromUnitKey(unit).getBombardDieCount() > 0) {
-                    if (ButtonHelper.isLawInPlay(getGame(), "articles_war")
-                        && getUnitFromUnitKey(unit).getBaseType().equalsIgnoreCase("mech")) {
-                        continue;
-                    }
-                    for (int x = 0; x < units.get(unit); x++) {
-                        addBombardUnit(getUnitFromUnitKey(unit).getAsyncId());
-                    }
-                }
-            }
-        }
-        if (hasTech("aida") || hasTech("absol_aida")) {
-            addBombardUnit("aida");
-        }
-        if (getGame().playerHasLeaderUnlockedOrAlliance(this, "argentcommander")) {
-            addBombardUnit("argentcommander");
-        }
     }
 
     public void setProducedUnit(String unit, int count) {
@@ -514,7 +466,6 @@ public class Player {
             return null;
 
         }
-
     }
 
     @Nullable
@@ -631,7 +582,7 @@ public class Player {
         // ATTEMPT TO FIND BY ID
         try {
             String cardsInfoThreadID = getCardsInfoThreadID();
-            boolean hasCardsInfoThreadId = cardsInfoThreadID != null && !cardsInfoThreadID.isBlank() && !cardsInfoThreadID.isEmpty() && !"null".equals(cardsInfoThreadID);
+            boolean hasCardsInfoThreadId = cardsInfoThreadID != null && !cardsInfoThreadID.isBlank() && !"null".equals(cardsInfoThreadID);
             if (cardsInfoThreadID != null && hasCardsInfoThreadId) {
                 ThreadChannel threadChannel = actionsChannel.getGuild().getThreadChannelById(cardsInfoThreadID);
                 if (threadChannel != null)
@@ -732,16 +683,8 @@ public class Player {
         return readyToPassBag;
     }
 
-    public boolean doesPlayerPreferDistanceBasedTacticalActions() {
-        return prefersDistanceBasedTacticalActions;
-    }
-
     public boolean doesPlayerAutoPassOnWhensAfters() {
         return autoPassOnWhensAfters;
-    }
-
-    public void setPreferenceForDistanceBasedTacticalActions(boolean preference) {
-        prefersDistanceBasedTacticalActions = preference;
     }
 
     public void setAutoPassWhensAfters(boolean preference) {
@@ -756,8 +699,8 @@ public class Player {
         readyToPassBag = passed;
     }
 
-    public void setWhetherPlayerShouldBeTenMinReminded(boolean status) {
-        tenMinReminderPing = status;
+    public void setWhetherPlayerShouldBeTenMinReminded(boolean tenMinReminderPing) {
+        this.tenMinReminderPing = tenMinReminderPing;
     }
 
     public Set<String> getAbilities() {
@@ -1055,9 +998,9 @@ public class Player {
 
     public void setPromissoryNote(String id) {
         Collection<Integer> values = promissoryNotes.values();
-        int identifier = ThreadLocalRandom.current().nextInt(100);
+        int identifier = ThreadLocalRandom.current().nextInt(values.size() < 80 ? 100 : 1000);
         while (values.contains(identifier)) {
-            identifier = ThreadLocalRandom.current().nextInt(100);
+            identifier = ThreadLocalRandom.current().nextInt(values.size() < 80 ? 100 : 1000);
         }
         promissoryNotes.put(id, identifier);
     }
@@ -1503,8 +1446,6 @@ public class Player {
                     }
                     if (ping) {
                         sb.append(" ").append(userById.getAsMention());
-                    } else {
-                        //sb.append(" ").append(userById.getEffectiveName());
                     }
                 }
                 if (getColor() != null && !"null".equals(getColor()) && !noColor) {
@@ -1598,7 +1539,7 @@ public class Player {
     private void initAbilities() {
         Set<String> abilities = new HashSet<>();
         for (String ability : getFactionStartingAbilities()) {
-            if (!ability.isEmpty() && !ability.isBlank()) {
+            if (!ability.isBlank()) {
                 abilities.add(ability);
             }
         }
@@ -1665,10 +1606,11 @@ public class Player {
     }
 
     public boolean isAFK() {
-        if (getHoursThatPlayerIsAFK().isEmpty()) {
+        String afkHours = UserSettingsManager.get(userID).getAfkHours();
+        if (isBlank(afkHours)) {
             return false;
         }
-        String[] hoursAFK = getHoursThatPlayerIsAFK().split(";");
+        String[] hoursAFK = afkHours.split(";");
         int currentHour = Helper.getCurrentHour();
         for (String hour : hoursAFK) {
             int h = Integer.parseInt(hour);
@@ -1796,22 +1738,6 @@ public class Player {
         if (!"null".equals(color)) {
             allianceMembers = allianceMembers + color;
         }
-    }
-
-    public void addHourThatIsAFK(String hour) {
-        if (hoursThatPlayerIsAFK.isEmpty()) {
-            hoursThatPlayerIsAFK = hour;
-        } else {
-            hoursThatPlayerIsAFK = hoursThatPlayerIsAFK + ";" + hour;
-        }
-    }
-
-    public void setHoursThatPlayerIsAFK(String hours) {
-        hoursThatPlayerIsAFK = hours;
-    }
-
-    public String getHoursThatPlayerIsAFK() {
-        return hoursThatPlayerIsAFK;
     }
 
     public void setAllianceMembers(String color) {
@@ -2148,7 +2074,10 @@ public class Player {
     }
 
     public List<String> getNotResearchedFactionTechs() {
-        return getFactionTechs().stream().filter(tech -> !hasTech(tech)).toList();
+        return getFactionTechs().stream()
+            .filter(tech -> !hasTech(tech))
+            .filter(tech -> !getPurgedTechs().contains(tech))
+            .toList();
     }
 
     public DraftBag getDraftHand() {
@@ -2392,8 +2321,7 @@ public class Player {
         }
     }
 
-    // Provided because people make mistakes, also nekro exists, also weird homebrew
-    // exists
+    // Provided because people make mistakes, also nekro exists, also weird homebrew exists
     private void doAdditionalThingsWhenRemovingTech(String techID) {
         // Remove Custodia Vigilia when un-researching IIHQ
         if ("iihq".equalsIgnoreCase(techID)) {
@@ -2421,13 +2349,8 @@ public class Player {
 
             // Find another unit model to replace this lost model
             String replacementUnit = unitModel.getBaseType(); // default
-            // if (unitModel.getUpgradesFromUnitId().isPresent() && !unitModel.getUpgradesFromUnitId().isEmpty()) {
-            //     addOwnedUnitByID(unitModel.getUpgradesFromUnitId().orElse(replacementUnit));
-            //     return;
-            // }
             if (relevantTechs.isEmpty() && unitModel.getBaseType() != null) {
                 // No other relevant unit upgrades
-                System.out.println("boop");
                 FactionModel factionSetup = getFactionSetupInfo();
                 replacementUnit = factionSetup.getUnits().stream().map(Mapper::getUnit)
                     .map(UnitModel::getId)
@@ -2457,15 +2380,16 @@ public class Player {
 
     public void removeTech(String tech) {
         exhaustedTechs.remove(tech);
-        techs.remove(tech);
-        doAdditionalThingsWhenRemovingTech(tech);
+        if (techs.remove(tech)) {
+            doAdditionalThingsWhenRemovingTech(tech);
+        }
     }
 
     public void purgeTech(String tech) {
         if (techs.contains(tech)) {
             removeTech(tech);
-            purgedTechs.add(tech);
         }
+        purgedTechs.add(tech);
     }
 
     public void addPlanet(String planet) {
@@ -2611,22 +2535,9 @@ public class Player {
         this.isDummy = isDummy;
     }
 
-    /**
-     * @return true if the player is: not a "dummy", faction != null, color != null,
-     *         & color != "null"
-     */
     @JsonIgnore
     public boolean isRealPlayer() {
         return !(isDummy || faction == null || color == null || "null".equals(color));
-    }
-
-    /**
-     * @return true if the player is: a "dummy", faction == null, color == null, &
-     *         color == "null"
-     */
-    @JsonIgnore
-    public boolean isNotRealPlayer() {
-        return !isRealPlayer();
     }
 
     public void setFogFilter(String preference) {
@@ -2684,7 +2595,7 @@ public class Player {
                 color = "No Color";
 
             String userName = getUserName();
-            if (userName == null || userName.isEmpty() || userName.isBlank()) {
+            if (userName == null || userName.isBlank()) {
                 userName = "No User";
             }
 
@@ -2970,7 +2881,7 @@ public class Player {
     @JsonIgnore
     public String getNextAvailableColorIgnoreCurrent() {
         Predicate<ColorModel> nonExclusive = cm -> !ColorChangeHelper.colorIsExclusive(cm.getAlias(), this);
-        String color = UserSettingsManager.get(getUserID()).getPreferredColourList().stream()
+        String color = UserSettingsManager.get(getUserID()).getPreferredColors().stream()
             .filter(c -> getGame().getUnusedColorsPreferringBase().stream().anyMatch(col -> col.getName().equals(c)))
             .filter(c -> !ColorChangeHelper.colorIsExclusive(c, this))
             .findFirst()

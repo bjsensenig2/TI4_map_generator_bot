@@ -22,6 +22,7 @@ import ti4.helpers.ButtonHelper;
 import ti4.helpers.ButtonHelperAbilities;
 import ti4.helpers.ColorChangeHelper;
 import ti4.helpers.Constants;
+import ti4.helpers.DateTimeHelper;
 import ti4.helpers.Emojis;
 import ti4.helpers.GlobalSettings;
 import ti4.helpers.Helper;
@@ -37,7 +38,6 @@ import ti4.helpers.settingsFramework.menus.SourceSettings;
 import ti4.image.Mapper;
 import ti4.image.PositionMapper;
 import ti4.map.Game;
-import ti4.map.GameManager;
 import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
 import ti4.map.Tile;
@@ -359,8 +359,8 @@ public class MiltyService {
         if (!slicesCreated || elapsed >= 10000000000L || debug) {
             StringBuilder sb = new StringBuilder();
             sb.append("Milty draft took a while... jazz, take a look:\n");
-            sb.append("`        Elapsed time:` ").append(Helper.getTimeRepresentationNanoSeconds(elapsed)).append("\n");
-            sb.append("`           Quit time:` ").append(Helper.getTimeRepresentationNanoSeconds(quitDiff)).append("\n");
+            sb.append("`        Elapsed time:` ").append(DateTimeHelper.getTimeRepresentationNanoSeconds(elapsed)).append("\n");
+            sb.append("`           Quit time:` ").append(DateTimeHelper.getTimeRepresentationNanoSeconds(quitDiff)).append("\n");
             sb.append("`    Number of cycles:` ").append(i).append("\n");
             for (Map.Entry<String, Integer> reason : reasons.entrySet()) {
                 sb.append("`").append(Helper.leftpad(reason.getKey(), 15)).append(" fail:` ").append(reason.getValue()).append("\n");
@@ -655,20 +655,6 @@ public class MiltyService {
                 "Player: " + player.getRepresentation() + " has been set up");
         } else {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), "Player was set up.");
-        }
-
-        Map<String, Game> mapList = GameManager.getGameNameToGame();
-        for (Game game2 : mapList.values()) {
-            for (Player player2 : game2.getRealPlayers()) {
-                if (player2.getUserID().equalsIgnoreCase(player.getUserID())) {
-                    if (!player2.getHoursThatPlayerIsAFK().isEmpty()) {
-                        player.setHoursThatPlayerIsAFK(player2.getHoursThatPlayerIsAFK());
-                    }
-                    if (player2.doesPlayerPreferDistanceBasedTacticalActions()) {
-                        player.setPreferenceForDistanceBasedTacticalActions(true);
-                    }
-                }
-            }
         }
 
         if (!game.isFowMode()) {

@@ -13,7 +13,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -71,7 +70,6 @@ import ti4.model.TechnologyModel;
 import ti4.model.UnitModel;
 import ti4.service.game.SetOrderService;
 import ti4.service.info.SecretObjectiveInfoService;
-import ti4.service.leader.UnlockLeaderService;
 import ti4.service.milty.MiltyDraftManager;
 import ti4.service.milty.MiltyDraftTile;
 import ti4.service.objectives.ScorePublicObjectiveService;
@@ -380,9 +378,6 @@ public class Helper {
                     String message = player.getRepresentationUnfogged()
                         + " is the one the game is currently waiting on before advancing to the next player, with regards to queued secret objective scoring.";
                     MessageHelper.sendMessageToChannel(player.getCorrectChannel(), message);
-                    if (game.isFowMode()) {
-                        message = "Waiting on someone else before proceeding with scoring.";
-                    }
                     break;
                 }
             }
@@ -735,7 +730,7 @@ public class Helper {
         if (unitHolder == null) {
             return getPlanetRepresentationPlusEmoji(planetID);
         } else {
-            String techType = "";
+            String techType;
             String techEmoji = "";
             if (Mapper.getPlanet(planetID) != null && Mapper.getPlanet(planetID).getTechSpecialties() != null
                 && !Mapper.getPlanet(planetID).getTechSpecialties().isEmpty()) {
@@ -877,7 +872,7 @@ public class Helper {
                 planetButtons.add(button);
                 continue;
             }
-            String techType = "none";
+            String techType;
             if (Mapper.getPlanet(planet).getTechSpecialties() != null
                 && !Mapper.getPlanet(planet).getTechSpecialties().isEmpty()) {
                 techType = Mapper.getPlanet(planet).getTechSpecialties().getFirst().toString().toLowerCase();
@@ -912,13 +907,10 @@ public class Helper {
             if (planet.contains("ghoti") || planet.contains("custodia")) {
                 continue;
             }
-            Button button = Buttons.red("FFCC_" + player.getFaction() + "_" + prefix + "_" + unit + "_" + planet,
-                getPlanetRepresentation(planet, game));
-            String emoji = unit;
-            if (emoji.equalsIgnoreCase("2gf") || emoji.equalsIgnoreCase("3gf")) {
-                emoji = "infantry";
+            Button button = Buttons.red("FFCC_" + player.getFaction() + "_" + prefix + "_" + unit + "_" + planet, getPlanetRepresentation(planet, game));
+            if (unit.equalsIgnoreCase("2gf") || unit.equalsIgnoreCase("3gf")) {
+                button = button.withEmoji(Emoji.fromFormatted(Emojis.infantry));
             }
-            button = button.withEmoji(Emoji.fromFormatted(Emojis.getEmojiFromDiscord(emoji)));
             planetButtons.add(button);
         }
         return planetButtons;
@@ -1007,7 +999,7 @@ public class Helper {
         int votes = 0;
         int tg = player.getSpentTgsThisWindow();
         for (String thing : spentThings) {
-            int count = 0;
+            int count;
             if (!thing.contains("_")) {
                 BotLogger.log("Caught the following thing in the voting " + thing + " in game " + game.getName());
                 continue;
@@ -1026,48 +1018,20 @@ public class Helper {
             }
             msg.append("> ");
             switch (flavor) {
-                case "tg" -> {
-                    msg.append("Spent ").append(tg).append(" trade good").append(tg == 1 ? "" : "s").append(" for ").append(tg * 2).append(" votes.\n");
-                }
-                case "infantry" -> {
-                    msg.append("Spent ").append(player.getSpentInfantryThisWindow()).append(" infantry for ").append(player.getSpentInfantryThisWindow()).append(" vote").append(player.getSpentInfantryThisWindow() == 1 ? "" : "s").append(".\n");
-                }
-                case "planet" -> {
-                    msg.append(getPlanetRepresentation(secondHalf, game)).append(" for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "absolShard" -> {
-                    msg.append("Used Absol Shard of the Throne for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "dsghotg" -> {
-                    msg.append("Exhausted some silly Ghoti Technology for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "absolsyncretone" -> {
-                    msg.append("Used Syncretone for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "augerscommander" -> {
-                    msg.append("Used Augurs Commander for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "zeal" -> {
-                    msg.append("Used Zeal Ability for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "predictive" -> {
-                    msg.append("Used Predictive Intelligence for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "specialVotes" -> {
-                    msg.append("Used Special Votes for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
-                }
-                case "representative" -> {
-                    msg.append("Got 1 vote for Representative Government.\n");
-                }
-                case "distinguished" -> {
-                    msg.append("Used the action card Distinguished Councilor for 5 votes.\n");
-                }
-                case "absolRexControlRepresentative" -> {
-                    msg.append("Got 1 vote for controlling Mecatol Rex while Representative Government is in play.\n");
-                }
-                case "bloodPact" -> {
-                    msg.append("Got 4 votes from voting the same way as another Blood Pact member.\n");
-                }
+                case "tg" -> msg.append("Spent ").append(tg).append(" trade good").append(tg == 1 ? "" : "s").append(" for ").append(tg * 2).append(" votes.\n");
+                case "infantry" -> msg.append("Spent ").append(player.getSpentInfantryThisWindow()).append(" infantry for ").append(player.getSpentInfantryThisWindow()).append(" vote").append(player.getSpentInfantryThisWindow() == 1 ? "" : "s").append(".\n");
+                case "planet" -> msg.append(getPlanetRepresentation(secondHalf, game)).append(" for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "absolShard" -> msg.append("Used Absol Shard of the Throne for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "dsghotg" -> msg.append("Exhausted some silly Ghoti Technology for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "absolsyncretone" -> msg.append("Used Syncretone for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "augerscommander" -> msg.append("Used Augurs Commander for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "zeal" -> msg.append("Used Zeal Ability for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "predictive" -> msg.append("Used Predictive Intelligence for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "specialVotes" -> msg.append("Used Special Votes for ").append(count).append(" vote").append(count == 1 ? "" : "s").append(".\n");
+                case "representative" -> msg.append("Got 1 vote for Representative Government.\n");
+                case "distinguished" -> msg.append("Used the action card Distinguished Councilor for 5 votes.\n");
+                case "absolRexControlRepresentative" -> msg.append("Got 1 vote for controlling Mecatol Rex while Representative Government is in play.\n");
+                case "bloodPact" -> msg.append("Got 4 votes from voting the same way as another Blood Pact member.\n");
 
             }
         }
@@ -1439,7 +1403,6 @@ public class Helper {
         if (player.getPlanets().contains(uH.getName()) && player.getLeader("nokarhero").map(Leader::isActive).orElse(false)) {
             productionValueTotal = productionValueTotal + 3;
             productionValueTotal = productionValueTotal - planetUnitVal;
-            planetUnitVal = 3;
             if (player.hasRelic("boon_of_the_cerulean_god")) {
                 productionValueTotal++;
             }
@@ -1524,10 +1487,8 @@ public class Helper {
             } else {
                 UnitKey unitKey = Mapper.getUnitKey(AliasHandler.resolveUnit(unit2), player.getColor());
                 UnitModel removedUnit = player.getUnitsByAsyncID(unitKey.asyncID()).getFirst();
-                if ("flagship".equalsIgnoreCase(removedUnit.getBaseType())
-                    && game.playerHasLeaderUnlockedOrAlliance(player, "nomadcommander")) {
-                    //cost = cost; // nomad alliance
-                } else {
+                if (!"flagship".equalsIgnoreCase(removedUnit.getBaseType()) ||
+                        !game.playerHasLeaderUnlockedOrAlliance(player, "nomadcommander")) {
                     cost = cost + (int) removedUnit.getCost() * producedUnits.get(unit);
                 }
                 totalUnits = totalUnits + producedUnits.get(unit);
@@ -1771,7 +1732,7 @@ public class Helper {
                     unitButtons.add(mfButton);
                 }
 
-            } else if (ButtonHelper.canIBuildGFInSpace(game, player, tile, warfareNOtherstuff)
+            } else if (ButtonHelper.canIBuildGFInSpace(player, tile, warfareNOtherstuff)
                 && !"sling".equalsIgnoreCase(warfareNOtherstuff)) {
                 Button inf1Button = Buttons.green(
                     "FFCC_" + player.getFaction() + "_" + placePrefix + "_infantry_space" + tile.getPosition(),
@@ -2103,6 +2064,10 @@ public class Helper {
      * @return left padded string
      */
     public static String leftpad(String text, int length) {
+        if (text.length() > length)
+        {
+            return text;
+        }
         return String.format("%" + length + "." + length + "s", text);
     }
 
@@ -2113,18 +2078,6 @@ public class Helper {
      */
     public static String rightpad(String text, int length) {
         return String.format("%-" + length + "." + length + "s", text);
-    }
-
-    public static void checkThreadLimitAndArchive(Guild guild) {
-        if (guild == null) return;
-        long threadCount = guild.getThreadChannels().stream().filter(c -> !c.isArchived()).count();
-        int closeCount = GlobalSettings.getSetting(GlobalSettings.ImplementedSettings.THREAD_AUTOCLOSE_COUNT.toString(), Integer.class, 25);
-        int maxThreadCount = GlobalSettings.getSetting(GlobalSettings.ImplementedSettings.MAX_THREAD_COUNT.toString(), Integer.class, 975);
-
-        if (threadCount >= maxThreadCount) {
-            BotLogger.log("AutoArchiving Threads on **" + guild.getName() + "** - (" + threadCount + " > " + maxThreadCount + ") -> archiving " + closeCount + " threads");
-            ThreadArchiveHelper.archiveOldThreads(guild, closeCount);
-        }
     }
 
     public static boolean isInteger(String str) {
@@ -2401,30 +2354,6 @@ public class Helper {
         return agendaDetails.getRepresentation(uniqueID);
     }
 
-    public static void checkIfHeroUnlocked(Game game, Player player) {
-        Leader playerLeader = player.getLeader(Constants.HERO).orElse(null);
-        if (playerLeader != null && playerLeader.isLocked()) {
-            int scoredSOCount = player.getSecretsScored().size();
-            int scoredPOCount = 0;
-            Map<String, List<String>> playerScoredPublics = game.getScoredPublicObjectives();
-            for (Entry<String, List<String>> scoredPublic : playerScoredPublics.entrySet()) {
-                if (Mapper.getPublicObjectivesStage1().containsKey(scoredPublic.getKey())
-                    || Mapper.getPublicObjectivesStage2().containsKey(scoredPublic.getKey())
-                    || game.getSoToPoList().contains(scoredPublic.getKey())
-                    || scoredPublic.getKey().contains("Throne of the False Emperor")) {
-                    if (scoredPublic.getValue().contains(player.getUserID())) {
-                        scoredPOCount++;
-                    }
-                }
-            }
-            int scoredObjectiveCount = scoredPOCount + scoredSOCount;
-            if (scoredObjectiveCount >= 3) {
-                // UnlockLeader ul = new UnlockLeader();
-                UnlockLeaderService.unlockLeader("hero", game, player);
-            }
-        }
-    }
-
     public static Role getEventGuildRole(GenericInteractionCreateEvent event, String roleName) {
         try {
             return event.getGuild().getRolesByName(roleName, true).getFirst();
@@ -2633,41 +2562,6 @@ public class Helper {
                 .getUrl();
         }
         return "Whoops invalid url. Have one of the players on the server generate an invite";
-    }
-
-    public static String getTimeRepresentationToSeconds(long totalMillis) {
-        long totalSeconds = totalMillis / 1000; // total seconds (truncates)
-        long seconds = totalSeconds % 60;
-        long totalMinutes = totalSeconds / 60; // total minutes (truncates)
-        long minutes = totalMinutes % 60;
-        long hours = totalMinutes / 60; // total hours (truncates)
-
-        return String.format("%02dh:%02dm:%02ds", hours, minutes, seconds);
-    }
-
-    public static String getTimeRepresentationNanoSeconds(long totalNanoSeconds) {
-        long totalMicroSeconds = totalNanoSeconds / 1000;
-        long totalMilliSeconds = totalMicroSeconds / 1000;
-        long totalSeconds = totalMilliSeconds / 1000;
-        // long totalMinutes = totalSeconds / 60;
-        // long totalHours = totalMinutes / 60;
-        // long totalDays = totalHours / 24;
-
-        long nanoSeconds = totalNanoSeconds % 1000;
-        long microSeconds = totalMicroSeconds % 1000;
-        long milleSeconds = totalMilliSeconds % 1000;
-        // long minutes = totalMinutes % 60;
-        // long hours = totalHours % 24;
-        // long days = totalDays;
-
-        // sb.append(String.format("%d:", days));
-        // sb.append(String.format("%02dh:", hours));
-        // sb.append(String.format("%02dm:", minutes));
-
-        return String.format("%02ds:", totalSeconds) +
-            String.format("%03d:", milleSeconds) +
-            String.format("%03d:", microSeconds) +
-            String.format("%03d", nanoSeconds);
     }
 
     public static long median(List<Long> turnTimes) {
