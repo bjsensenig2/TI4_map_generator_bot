@@ -56,6 +56,7 @@ import ti4.model.PublicObjectiveModel;
 import ti4.model.RelicModel;
 import ti4.model.SecretObjectiveModel;
 import ti4.model.Source.ComponentSource;
+import ti4.model.SourceModel;
 import ti4.model.StrategyCardModel;
 import ti4.model.StrategyCardSetModel;
 import ti4.model.TechnologyModel;
@@ -96,6 +97,7 @@ public class Mapper {
     private static final Map<String, DraftErrataModel> frankenErrata = new HashMap<>();
     private static final Map<String, MapTemplateModel> mapTemplates = new HashMap<>();
     private static final Map<String, GenericCardModel> genericCards = new HashMap<>();
+    private static final Map<String, SourceModel> sources = new HashMap<>();
 
     public static void init() {
         try {
@@ -135,6 +137,7 @@ public class Mapper {
         importJsonObjectsFromFolder("franken_errata", frankenErrata, DraftErrataModel.class);
         importJsonObjectsFromFolder("map_templates", mapTemplates, MapTemplateModel.class);
         importJsonObjectsFromFolder("genericcards", genericCards, GenericCardModel.class);
+        importJsonObjectsFromFolder("sources", sources, SourceModel.class);
 
         duplicateObjectsForAllColors(promissoryNotes);
     }
@@ -972,5 +975,18 @@ public class Mapper {
             }
         }
         return displayName;
+    }
+
+
+    public static Map<String, SourceModel> getSources() {
+        return new HashMap<>(sources);
+    }
+
+    public static boolean isValidSource(String sourceID) {
+        return sources.containsKey(sourceID);
+    }
+
+    public static SourceModel getSource(String sourceID) {
+        return sources.get(sourceID);
     }
 }
