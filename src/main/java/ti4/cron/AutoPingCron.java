@@ -19,12 +19,13 @@ import ti4.map.Game;
 import ti4.map.GameManager;
 import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
+import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
 import ti4.model.ActionCardModel;
 import ti4.model.StrategyCardModel;
 import ti4.service.player.PlayerReactService;
 import ti4.service.tech.PlayerTechService;
-import ti4.users.UserSettingsManager;
+import ti4.settings.users.UserSettingsManager;
 
 import static java.util.function.Predicate.not;
 
@@ -42,6 +43,12 @@ public class AutoPingCron {
     private static void autoPingGames() {
         var games = GameManager.getGameNameToGame().values().stream().filter(not(Game::isHasEnded)).toList();
         for (Game game : games) {
+            autoPingGame(game);
+        }
+    }
+
+    private static void autoPingGame(Game game) {
+        try {
             handleTechSummary(game); // TODO, move this?
             checkAllSaboWindows(game);
             if (game.isFastSCFollowMode()) {
@@ -51,6 +58,8 @@ public class AutoPingCron {
             if (game.getAutoPingStatus() && !game.isTemporaryPingDisable()) {
                 handleAutoPing(game, player);
             }
+        } catch (Exception e) {
+            BotLogger.log("AutoPing failed for game: " + game.getName(), e);
         }
     }
 
@@ -94,7 +103,7 @@ public class AutoPingCron {
     }
 
     private static boolean canPlayerConceivablySabo(Player player, Game game) {
-        return player.hasTechReady("it") && player.getStrategicCC() > 0 ||
+        return player.getStrategicCC() > 0 && player.hasTechReady("it")  ||
             player.hasUnit("empyrean_mech") && !ButtonHelper.getTilesOfPlayersSpecificUnits(game, player, Units.UnitType.Mech).isEmpty() ||
             player.getAc() > 0;
     }
@@ -182,9 +191,6 @@ public class AutoPingCron {
         pingMessage = getPingMessage(milliSinceLastTurnChange, spacer, pingMessage, realIdentity, pingNumber);
 
         pingPlayer(game, player, milliSinceLastTurnChange, spacer, pingMessage, pingNumber, realIdentity);
-
-        Game mapReference = GameManager.getGame("finreference");
-        if (mapReference != null) ButtonHelper.increasePingCounter(mapReference, player.getUserID());
         player.setWhetherPlayerShouldBeTenMinReminded(false);
         game.setLastActivePlayerPing(new Date());
         GameSaveLoadManager.saveGame(game, "Auto Ping");
@@ -231,6 +237,10 @@ public class AutoPingCron {
         for (Player player : game.getRealPlayers()) {
             for (int sc : game.getPlayedSCsInOrder(player)) {
                 if (player.hasFollowedSC(sc)) continue;
+
+                String scTime = game.getStoredValue("scPlayMsgTime" + game.getRound() + sc);
+                if (scTime.isEmpty()) continue;
+
                 int twenty4 = 24;
                 int half = 12;
                 if (!game.getStoredValue("fastSCFollow").isEmpty()) {
@@ -239,27 +249,23 @@ public class AutoPingCron {
                 }
                 long twelveHoursInMilliseconds = (long) half * ONE_HOUR_IN_MILLISECONDS;
                 long twentyFourHoursInMilliseconds = (long) twenty4 * ONE_HOUR_IN_MILLISECONDS;
-                String scTime = game.getStoredValue("scPlayMsgTime" + game.getRound() + sc);
-                if (scTime.isEmpty()) {
-                    return;
-                }
                 long scPlayTime = Long.parseLong(scTime);
                 long timeDifference = System.currentTimeMillis() - scPlayTime;
-                String timesPinged = game
-                    .getStoredValue("scPlayPingCount" + sc + player.getFaction());
+                String timesPinged = game.getStoredValue("scPlayPingCount" + sc + player.getFaction());
                 if (timeDifference > twelveHoursInMilliseconds && timeDifference < twentyFourHoursInMilliseconds && !timesPinged.equalsIgnoreCase("1")) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(player.getRepresentationUnfogged());
-                    sb.append(" You are getting this ping because ").append(Helper.getSCName(sc, game))
-                        .append(" has been played and now it has been half the allotted time and you haven't reacted. Please do so, or after another half you will be marked as not following.");
+                    StringBuilder sb = new StringBuilder()
+                        .append(player.getRepresentationUnfogged())
+                        .append(" You are getting this ping because ").append(Helper.getSCName(sc, game))
+                        .append(" has been played and now it has been half the allotted time and you haven't reacted. Please do so, or after another ")
+                        .append("half you will be marked as not following.");
                     appendScMessages(game, player, sc, sb);
                     game.setStoredValue("scPlayPingCount" + sc + player.getFaction(), "1");
                 }
                 if (timeDifference > twentyFourHoursInMilliseconds && !timesPinged.equalsIgnoreCase("2")) {
-                    String sb = player.getRepresentationUnfogged() + Helper.getSCName(sc, game) +
-                        " has been played and now it has been the allotted time and they haven't reacted, so they have been marked as not following.\n";
-
-                    ButtonHelper.sendMessageToRightStratThread(player, game, sb, ButtonHelper.getStratName(sc));
+                    String message = player.getRepresentationUnfogged() + Helper.getSCName(sc, game) +
+                        " has been played and now it has been the allotted time and they haven't reacted, so they have " +
+                        "been marked as not following.\n";
+                    ButtonHelper.sendMessageToRightStratThread(player, game, message, ButtonHelper.getStratName(sc));
                     player.addFollowedSC(sc);
                     game.setStoredValue("scPlayPingCount" + sc + player.getFaction(), "2");
                     String messageID = game.getStoredValue("scPlayMsgID" + sc);

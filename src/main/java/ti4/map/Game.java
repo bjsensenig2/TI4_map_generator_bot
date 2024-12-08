@@ -44,6 +44,7 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.internal.utils.tuple.ImmutablePair;
 import net.dv8tion.jda.internal.utils.tuple.Pair;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import ti4.AsyncTI4DiscordBot;
 import ti4.commands2.planet.PlanetRemove;
@@ -304,6 +305,7 @@ public class Game extends GameProperties {
         return returnValue;
     }
 
+    @NotNull
     @JsonIgnore
     public MiltyDraftManager getMiltyDraftManager() {
         if (miltyDraftManager == null) {
@@ -3071,20 +3073,6 @@ public class Game extends GameProperties {
         this.discardActionCards = discardActionCards;
     }
 
-    @JsonIgnore
-    public void setPurgedActionCards(List<String> purgedActionCardList) {
-        Map<String, Integer> purgedActionCards = new LinkedHashMap<>();
-        for (String card : purgedActionCardList) {
-            Collection<Integer> values = purgedActionCards.values();
-            int identifier = ThreadLocalRandom.current().nextInt(1000);
-            while (values.contains(identifier)) {
-                identifier = ThreadLocalRandom.current().nextInt(1000);
-            }
-            purgedActionCards.put(card, identifier);
-        }
-        this.purgedActionCards = purgedActionCards;
-    }
-
     public String getGameNameForSorting() {
         if (getName().startsWith("pbd")) {
             return StringUtils.leftPad(getName(), 10, "0");
@@ -3871,35 +3859,31 @@ public class Game extends GameProperties {
 
     @Nullable
     public Player getPlayerFromColorOrFaction(String factionOrColor) {
-        Player player = null;
-        if (factionOrColor != null) {
-            String factionColor = AliasHandler.resolveColor(factionOrColor.toLowerCase());
-            factionColor = StringUtils.substringBefore(factionColor, " "); // TO HANDLE UNRESOLVED AUTOCOMPLETE
-            factionColor = AliasHandler.resolveFaction(factionColor);
-            for (Player player_ : getPlayers().values()) {
-                if ("keleres".equalsIgnoreCase(factionColor)) {
-                    if (Objects.equals(factionColor + "a", player_.getFaction())) {
-                        player = player_;
-                        break;
-                    }
-                    if (Objects.equals(factionColor + "x", player_.getFaction())) {
-                        player = player_;
-                        break;
-                    }
-                    if (Objects.equals(factionColor + "m", player_.getFaction())) {
-                        player = player_;
-                        break;
-                    }
+        if (factionOrColor == null) {
+            return null;
+        }
+        String factionColor = AliasHandler.resolveColor(factionOrColor.toLowerCase());
+        factionColor = StringUtils.substringBefore(factionColor, " "); // TO HANDLE UNRESOLVED AUTOCOMPLETE
+        factionColor = AliasHandler.resolveFaction(factionColor);
+        for (Player player : getPlayers().values()) {
+            if ("keleres".equalsIgnoreCase(factionColor)) {
+                if (Objects.equals(factionColor + "a", player.getFaction())) {
+                    return player;
                 }
-                if (Objects.equals(factionColor, player_.getFaction()) ||
-                    Objects.equals(factionColor, player_.getColor()) ||
-                    Objects.equals(factionColor, player_.getColorID())) {
-                    player = player_;
-                    break;
+                if (Objects.equals(factionColor + "x", player.getFaction())) {
+                    return player;
+                }
+                if (Objects.equals(factionColor + "m", player.getFaction())) {
+                    return player;
                 }
             }
+            if (Objects.equals(factionColor, player.getFaction()) ||
+                Objects.equals(factionColor, player.getColor()) ||
+                Objects.equals(factionColor, player.getColorID())) {
+                return player;
+            }
         }
-        return player;
+        return null;
     }
 
     @Nullable

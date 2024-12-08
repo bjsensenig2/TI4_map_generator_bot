@@ -1,24 +1,17 @@
 package ti4.listeners;
 
 import javax.annotation.Nonnull;
-import java.util.List;
 
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
-import net.dv8tion.jda.api.entities.channel.unions.IThreadContainerUnion;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import ti4.AsyncTI4DiscordBot;
 import ti4.commands2.Command;
 import ti4.commands2.CommandManager;
-import ti4.helpers.Constants;
 import ti4.helpers.DateTimeHelper;
-import ti4.map.Game;
-import ti4.map.GameManager;
 import ti4.message.BotLogger;
+import ti4.service.SusSlashCommandService;
 
 public class SlashCommandListener extends ListenerAdapter {
 
@@ -31,18 +24,20 @@ public class SlashCommandListener extends ListenerAdapter {
 
         event.getInteraction().deferReply().queue();
 
-        AsyncTI4DiscordBot.runAsync("Slash command task", () -> process(event));
+        AsyncTI4DiscordBot.runAsync("Slash command task: " + event.getFullCommandName(), () -> process(event));
     }
 
     private static void process(SlashCommandInteractionEvent event) {
         long eventTime = DateTimeHelper.getLongDateTimeFromDiscordSnowflake(event.getInteraction());
-
         long startTime = System.currentTimeMillis();
 
         Member member = event.getMember();
         if (member != null) {
             String commandText = "```fix\n" + member.getEffectiveName() + " used " + event.getCommandString() + "\n```";
-            event.getChannel().sendMessage(commandText).queue(m -> BotLogger.logSlashCommand(event, m), BotLogger::catchRestError);
+            event.getChannel().sendMessage(commandText).queue(m -> {
+                BotLogger.logSlashCommand(event, m);
+                SusSlashCommandService.checkIfShouldReportSusSlashCommand(event, m.getJumpUrl());
+            }, BotLogger::catchRestError);
         }
 
         Command command = CommandManager.getCommand(event.getName());
@@ -73,45 +68,5 @@ public class SlashCommandListener extends ListenerAdapter {
                 DateTimeHelper.getTimestampFromMillesecondsEpoch(endTime) + " `" + executionTime + "` to execute" + (endTime - startTime > startTime - eventTime ? "😲" : "");
             BotLogger.log(message);
         }
-    }
-
-    public static boolean setActiveGame(MessageChannel channel, String userID, String eventName, String subCommandName) {
-        String channelName = channel.getName();
-        Game userActiveGame = GameManager.getUserActiveGame(userID);
-        List<String> mapList = GameManager.getGameNames();
-
-        String gameID = StringUtils.substringBefore(channelName, "-");
-        boolean gameExists = mapList.contains(gameID);
-
-        boolean isThreadEnabledSubcommand = (Constants.COMBAT.equals(eventName) && Constants.COMBAT_ROLL.equals(subCommandName));
-        if (!gameExists && channel instanceof ThreadChannel && isThreadEnabledSubcommand) {
-            IThreadContainerUnion parentChannel = ((ThreadChannel) channel).getParentChannel();
-            channelName = parentChannel.getName();
-            gameID = StringUtils.substringBefore(channelName, "-");
-            gameExists = mapList.contains(gameID);
-        }
-
-        boolean isUnprotectedCommand = eventName.contains(Constants.SHOW_GAME)
-            || eventName.contains(Constants.BOTHELPER) || eventName.contains(Constants.ADMIN)
-            || eventName.contains(Constants.DEVELOPER);
-        boolean isUnprotectedCommandSubcommand = (Constants.GAME.equals(eventName)
-            && Constants.CREATE_GAME.equals(subCommandName));
-        if (!gameExists && !(isUnprotectedCommand) && !(isUnprotectedCommandSubcommand)) {
-            return false;
-        }
-        if (gameExists && (GameManager.getUserActiveGame(userID) == null
-            || !GameManager.getUserActiveGame(userID).getName().equals(gameID)
-                && (GameManager.getGame(gameID) != null && (GameManager.getGame(gameID).isCommunityMode()
-                    || GameManager.getGame(gameID).getPlayerIDs().contains(userID))))) {
-            GameManager.setGameForUser(userID, gameID);
-        } else if (GameManager.isUserWithActiveGame(userID)) {
-            if (gameExists && !channelName.startsWith(userActiveGame.getName())) {
-                // MessageHelper.sendMessageToChannel(channel,"Active game reset. Channel name
-                // indicates to have map associated with it. Please select correct active game
-                // or do action in neutral channel");
-                GameManager.resetGameForUser(userID);
-            }
-        }
-        return true;
     }
 }

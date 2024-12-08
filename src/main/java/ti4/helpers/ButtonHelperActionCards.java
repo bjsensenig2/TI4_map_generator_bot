@@ -1537,7 +1537,7 @@ public class ButtonHelperActionCards {
     }
 
     @ButtonHandler("resolveTacticalBombardmentStep1")
-    public static void resolveTacticalBombardmentStep1(Player player, Game game, ButtonInteractionEvent event, String buttonID) {
+    public static void resolveTacticalBombardmentStep1(Player player, Game game, ButtonInteractionEvent event) {
         List<Button> buttons = getTacticalBombardmentButtons(game, player);
         ButtonHelper.deleteMessage(event);
         MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(),
@@ -1681,7 +1681,7 @@ public class ButtonHelperActionCards {
             var parsedUnit = new ParsedUnit(key, hits, planet);
             RemoveUnitService.removeUnit(event, game.getTileFromPlanet(planet), game, parsedUnit);
             MessageHelper.sendMessageToChannel(p2.getCorrectChannel(), msg.toString());
-            ButtonHelper.resolveInfantryDeath(player, hits);
+            ButtonHelper.resolveInfantryDeath(p2, hits);
             if ((p2.getUnitsOwned().contains("mahact_infantry") || p2.hasTech("cl2"))) {
                 ButtonHelperFactionSpecific.offerMahactInfButtons(p2, game);
             }

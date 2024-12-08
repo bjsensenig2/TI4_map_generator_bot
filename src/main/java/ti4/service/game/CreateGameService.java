@@ -36,7 +36,6 @@ import ti4.ResourceHelper;
 import ti4.buttons.Buttons;
 import ti4.helpers.ButtonHelper;
 import ti4.helpers.Constants;
-import ti4.helpers.GlobalSettings;
 import ti4.helpers.Helper;
 import ti4.helpers.TIGLHelper;
 import ti4.helpers.ThreadHelper;
@@ -48,6 +47,7 @@ import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
 import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
+import ti4.settings.GlobalSettings;
 
 @UtilityClass
 public class CreateGameService {
@@ -62,11 +62,7 @@ public class CreateGameService {
         newGame.setAutoPing(true);
         newGame.setAutoPingSpacer(24);
         GameManager.addGame(newGame);
-        boolean setMapSuccessful = GameManager.setGameForUser(ownerID, gameName);
         newGame.addPlayer(gameOwner.getId(), gameOwner.getEffectiveName());
-        if (!setMapSuccessful) {
-            MessageHelper.replyToMessage(event, "Could not assign active Game " + gameName);
-        }
         GameSaveLoadManager.saveGame(newGame, event);
         return newGame;
     }

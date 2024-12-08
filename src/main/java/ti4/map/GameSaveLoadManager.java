@@ -743,8 +743,7 @@ public class GameSaveLoadManager {
 
         if (game.getRound() == 1 && !game.isHasEnded()) {
             MiltyDraftManager manager = game.getMiltyDraftManager();
-            boolean miltyDraftFinished = manager == null || manager.isFinished();
-            if (!miltyDraftFinished) {
+            if (!manager.isFinished()) {
                 writer.write(Constants.MILTY_DRAFT_MANAGER + " " + manager.superSaveMessage());
                 writer.write(System.lineSeparator());
 
@@ -1227,9 +1226,8 @@ public class GameSaveLoadManager {
             BotLogger.log("Could not load map, map file does not exist: " + (gameFile == null ? "null file" : gameFile.getAbsolutePath()));
             return null;
         }
-        Game game = new Game();
-        boolean fatalError = false;
         try {
+            Game game = new Game();
             Iterator<String> gameFileLines = Files.readAllLines(gameFile.toPath(), Charset.defaultCharset()).listIterator();
             game.setOwnerID(gameFileLines.next());
             game.setOwnerName(gameFileLines.next());
@@ -1254,8 +1252,8 @@ public class GameSaveLoadManager {
                     try {
                         readGameInfo(game, data);
                     } catch (Exception e) {
-                        BotLogger.log("Data is bad: " + game.getName(), e);
-                        fatalError = true;
+                        BotLogger.log("Encountered fatal error loading game " + game.getName() + ". Load aborted.");
+                        return null;
                     }
                 }
 
@@ -1283,7 +1281,7 @@ public class GameSaveLoadManager {
                 }
             }
             Map<String, Tile> tileMap = getTileMap(gameFileLines, game, gameFile);
-            if (tileMap == null || fatalError) {
+            if (tileMap == null) {
                 BotLogger.log("Encountered fatal error loading game " + game.getName() + ". Load aborted.");
                 return null;
             }
@@ -2201,12 +2199,7 @@ public class GameSaveLoadManager {
                         if (game.getRound() == 1 && !game.isHasEnded()) {
                             MiltyDraftManager manager = game.getMiltyDraftManager();
                             manager.init(game);
-                            manager.loadSuperSaveString(game, info);
-                            if (manager.isFinished()) {
-                                game.setMiltyJson(null);
-                                game.setMiltySettings(null);
-                                game.setMiltyDraftManager(null);
-                            }
+                            manager.loadSuperSaveString(info);
                         }
                     } catch (Exception e) {
                         // Do nothing
