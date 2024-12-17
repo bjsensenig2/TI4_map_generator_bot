@@ -7,33 +7,29 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
-import net.dv8tion.jda.api.entities.emoji.CustomEmoji;
-import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.command.GenericCommandInteractionEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ti4.AsyncTI4DiscordBot;
 import ti4.helpers.Units.UnitKey;
 import ti4.helpers.Units.UnitType;
 import ti4.image.Mapper;
 import ti4.image.PositionMapper;
 import ti4.map.Game;
-import ti4.map.GameManager;
 import ti4.map.Player;
 import ti4.map.Tile;
 import ti4.map.UnitHolder;
-import ti4.message.BotLogger;
+import ti4.map.manage.GameManager;
 import ti4.message.MessageHelper;
 import ti4.model.BorderAnomalyHolder;
 import ti4.model.WormholeModel;
 import ti4.service.combat.StartCombatService;
+import ti4.service.game.GameNameService;
 
 public class FoWHelper {
 
@@ -56,21 +52,18 @@ public class FoWHelper {
 		return isPrivateGame(game, null, null);
 	}
 
-	public static boolean isPrivateGame(Game game, @Nullable GenericInteractionCreateEvent event,
-		@Nullable Channel channel_) {
+	public static boolean isPrivateGame(Game game, @Nullable GenericInteractionCreateEvent event, @Nullable Channel channel_) {
 		Channel eventChannel = event == null ? null : event.getChannel();
 		Channel channel = channel_ != null ? channel_ : eventChannel;
 		if (channel == null) {
 			return game.isFowMode();
 		}
 		if (game == null) {
-			String gameName = channel.getName();
-			gameName = gameName.replace(Constants.CARDS_INFO_THREAD_PREFIX, "");
-			gameName = gameName.substring(0, gameName.indexOf("-"));
-			game = GameManager.getGame(gameName);
-			if (game == null) {
+			String gameName = GameNameService.getGameNameFromChannel(channel);
+			if (!GameManager.isValid(gameName)) {
 				return false;
 			}
+			game = GameManager.getManagedGame(gameName).getGame();
 		}
 		if (game.isFowMode() && channel_ != null || event != null) {
 			return channel.getName().endsWith(Constants.PRIVATE_CHANNEL);
@@ -78,10 +71,6 @@ public class FoWHelper {
 		return false;
 	}
 
-	/**
-	 * Method to determine of a viewing player should be able to see the stats of a
-	 * particular faction
-	 */
 	public static boolean canSeeStatsOfFaction(Game game, String faction, Player viewingPlayer) {
 		for (Player player : game.getPlayers().values()) {
 			if (faction.equals(player.getFaction())) {
@@ -91,10 +80,6 @@ public class FoWHelper {
 		return false;
 	}
 
-	/**
-	 * Method to determine of a viewing player should be able to see the stats of a
-	 * particular player
-	 */
 	public static boolean canSeeStatsOfPlayer(Game game, Player player, Player viewingPlayer) {
 		if (!player.isRealPlayer() || !viewingPlayer.isRealPlayer()) {
 			return false;
@@ -103,7 +88,7 @@ public class FoWHelper {
 			return true;
 		}
 
-		return game != null && (hasHomeSystemInView(game, player, viewingPlayer) || hasPlayersPromInPlayArea(player, viewingPlayer) || hasMahactCCInFleet(player, viewingPlayer) || viewingPlayer.getAllianceMembers().contains(player.getFaction()));
+		return game != null && (hasHomeSystemInView(player, viewingPlayer) || hasPlayersPromInPlayArea(player, viewingPlayer) || hasMahactCCInFleet(player, viewingPlayer) || viewingPlayer.getAllianceMembers().contains(player.getFaction()));
 	}
 
 	/**
@@ -194,11 +179,10 @@ public class FoWHelper {
 		}
 	}
 
-	public static boolean hasHomeSystemInView(@NotNull Game game, @NotNull Player player,
-		@NotNull Player viewingPlayer) {
+	public static boolean hasHomeSystemInView(@NotNull Player player, @NotNull Player viewingPlayer) {
 		Tile tile = player.getHomeSystemTile();
-        return tile != null && !tile.hasFog(viewingPlayer);
-    }
+		return tile != null && !tile.hasFog(viewingPlayer);
+	}
 
 	private static boolean hasPlayersPromInPlayArea(@NotNull Player player, @NotNull Player viewingPlayer) {
 		boolean hasPromInPA = false;
@@ -257,18 +241,27 @@ public class FoWHelper {
 		Set<String> wormholeAdjacencies = getWormholeAdjacencies(game, position, player);
 		adjacentPositions.addAll(wormholeAdjacencies);
 
-		if (player != null && game.playerHasLeaderUnlockedOrAlliance(player, "ghoticommander")
-			&& player == game.getActivePlayer() && !game.getActiveSystem().isEmpty()
-			&& game.getTileByPosition(game.getActiveSystem()).getPlanetUnitHolders().isEmpty()) {
-			Collection<Tile> tileList = game.getTileMap().values();
-			List<String> frontierTileList = Mapper.getFrontierTileIds();
-			for (Tile tile : tileList) {
-				if (tile.getPlanetUnitHolders().isEmpty() && (tile.getUnitHolders().size() == 2
-					|| frontierTileList.contains(tile.getTileID()))) {
-					adjacentPositions.add(tile.getPosition());
-				}
-			}
-		}
+    //If player has ghoti commander, is active player and has activated a system
+    if (player != null && game.playerHasLeaderUnlockedOrAlliance(player, "ghoticommander")
+			&& player == game.getActivePlayer() && !game.getCurrentActiveSystem().isEmpty()) {
+        Set<Player> playersToCheck = new HashSet<>();
+        playersToCheck.add(player);
+        if (game.isAllianceMode()) {
+          playersToCheck.addAll(game.getRealPlayers().stream()
+              .filter(alliancePlayer -> player.getAllianceMembers().contains(alliancePlayer.getFaction())) 
+              .collect(Collectors.toSet()));
+        }
+
+        //Check that they or their alliance have units in any empty system to be able to see the other empties as adjacencies
+        Set<Tile> emptyTiles = getEmptyTiles(game);
+        boolean containsUnits = emptyTiles.stream().anyMatch(tile -> playersToCheck.stream().anyMatch(p -> tile.containsPlayersUnits(p)));
+        if (containsUnits) {
+            adjacentPositions.addAll(emptyTiles.stream()
+                .map(Tile::getPosition)
+                .collect(Collectors.toSet()));
+        }   		
+    }
+
 		if (includeTile) {
 			adjacentPositions.add(position);
 		} else {
@@ -276,6 +269,19 @@ public class FoWHelper {
 		}
 		return adjacentPositions;
 	}
+
+  private static Set<Tile> getEmptyTiles(Game game) {
+      Set<Tile> emptyTiles = new HashSet<>();
+      Collection<Tile> tileList = game.getTileMap().values();
+      List<String> frontierTileList = Mapper.getFrontierTileIds();
+      for (Tile tile : tileList) {
+        if (tile.getPlanetUnitHolders().isEmpty() && (tile.getUnitHolders().size() == 2 
+          || frontierTileList.contains(tile.getTileID()))) {
+            emptyTiles.add(tile);
+        }
+      }
+      return emptyTiles;
+  }
 
 	public static Set<String> getAdjacentTilesAndNotThisTile(Game game, String position, Player player, boolean toShow) {
 
@@ -388,7 +394,7 @@ public class FoWHelper {
 
 		String ghostFlagshipColor = null;
 		for (Player p : game.getPlayers().values()) {
-			if (p.ownsUnit("ghost_flagship")) {
+			if (p.ownsUnit("ghost_flagship") || p.ownsUnit("sigma_creuss_flagship_1") || p.ownsUnit("sigma_creuss_flagship_2")) {
 				ghostFlagshipColor = p.getColor();
 				break;
 			}
@@ -507,7 +513,7 @@ public class FoWHelper {
 
 		String ghostFlagshipColor = null;
 		for (Player p : game.getPlayers().values()) {
-			if (p.ownsUnit("ghost_flagship")) {
+			if (p.ownsUnit("ghost_flagship") || p.ownsUnit("sigma_creuss_flagship_1") || p.ownsUnit("sigma_creuss_flagship_2")) {
 				ghostFlagshipColor = p.getColor();
 				break;
 			}
@@ -528,8 +534,8 @@ public class FoWHelper {
 				}
 				for (WormholeModel.Wormhole wh : WormholeModel.Wormhole.values()) {
 					if (tokenName.contains(wh.getWhString())) {
-							wormholeIDs.add(wh.toString());
-  						break;
+						wormholeIDs.add(wh.toString());
+						break;
 					}
 				}
 			}
@@ -566,8 +572,8 @@ public class FoWHelper {
 				Set<String> tokenList = unitHolder.getTokenList();
 				for (String token : tokenList) {
 					for (String wormholeID : wormholeIDs) {
-						if (token.contains(wormholeID) && !(wormholeID.equals("eta") 
-              && (token.contains("beta") || token.contains("theta") || token.contains("zeta") ))) {
+						if (token.contains(wormholeID) && !(wormholeID.equals("eta")
+							&& (token.contains("beta") || token.contains("theta") || token.contains("zeta")))) {
 							adjacentPositions.add(position_);
 						}
 					}
@@ -637,6 +643,16 @@ public class FoWHelper {
 			return true;
 		}
 
+    if (game.isAllianceMode()) {
+      boolean allianceHasUnits = game.getRealPlayers().stream()
+          .filter(alliancePlayer -> alliancePlayer != player) 
+          .filter(alliancePlayer -> player.getAllianceMembers().contains(alliancePlayer.getFaction())) 
+          .anyMatch(alliancePlayer -> playerHasUnitsInSystem(alliancePlayer, tile));
+  
+      if (allianceHasUnits) {
+          return true;
+      }
+    }
 		return playerHasUnitsInSystem(player, tile);
 	}
 
@@ -883,7 +899,7 @@ public class FoWHelper {
 				sb.append("???");
 			}
 			sb.append(" sent ").append(transactedObject).append(" to ");
-            if (receiverVisible) {
+			if (receiverVisible) {
 				sb.append(receivingPlayer.getRepresentation());
 			} else {
 				sb.append("???");
@@ -915,23 +931,5 @@ public class FoWHelper {
 			return false;
 		initializeFog(game, viewer, false);
 		return canSeeStatsOfPlayer(game, player, viewer);
-	}
-
-	public static void sanityCheckFowReacts() {
-		List<String> badEmojis = new ArrayList<>(Emojis.symbols).stream()
-			.map(Emoji::fromFormatted)
-			.map(emoji -> (emoji instanceof CustomEmoji c) ? c : null)
-			.filter(Objects::nonNull)
-			.filter(e -> AsyncTI4DiscordBot.jda.getEmojiById(e.getId()) == null)
-			.map(emoji -> emoji.getName() + " " + emoji.getId())
-			.toList();
-		if (!badEmojis.isEmpty()) {
-			StringBuilder sb = new StringBuilder(Constants.jazzPing());
-			sb.append(" Bad emojis are being used for FOW reacts:\n");
-			for (String err : badEmojis) {
-				sb.append("```\n").append(err).append("\n```");
-			}
-			BotLogger.log(sb.toString());
-		}
 	}
 }

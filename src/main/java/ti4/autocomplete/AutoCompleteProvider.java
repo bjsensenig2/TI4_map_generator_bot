@@ -29,8 +29,9 @@ import ti4.helpers.Helper;
 import ti4.image.Mapper;
 import ti4.image.TileHelper;
 import ti4.map.Game;
-import ti4.map.GameManager;
 import ti4.map.Player;
+import ti4.map.manage.GameManager;
+import ti4.map.manage.ManagedGame;
 import ti4.message.BotLogger;
 import ti4.model.AbilityModel;
 import ti4.model.BorderAnomalyModel;
@@ -55,7 +56,7 @@ import ti4.model.WormholeModel;
 import ti4.service.UnitDecalService;
 import ti4.service.franken.FrankenDraftMode;
 import ti4.service.game.GameNameService;
-import ti4.service.game.UndoService;
+import ti4.service.game.GameUndoNameService;
 import ti4.service.map.MapPresetService;
 import ti4.service.statistics.PlayerStatTypes;
 import ti4.service.statistics.game.GameStatTypes;
@@ -86,28 +87,27 @@ public class AutoCompleteProvider {
         }
 
         String gameName = GameNameService.getGameNameFromChannel(event);
-        Game game = GameManager.getGame(gameName);
-        if (game != null && subCommandName != null) {
+        if (GameManager.isValid(gameName) && subCommandName != null) {
             switch (commandName) {
-                case Constants.MAP -> resolveMapAutoComplete(event, subCommandName, optionName, game);
-                case Constants.CARDS_AC -> resolveActionCardDiscardAutoComplete(event, subCommandName, optionName, game);
-                case Constants.EXPLORE -> resolveExploreAutoComplete(event, subCommandName, optionName, game);
-                case Constants.STATUS -> resolveStatusAutoComplete(event, subCommandName, optionName, game);
-                case Constants.AGENDA -> resolveAgendaAutoComplete(event, subCommandName, optionName, game);
-                case Constants.EVENT -> resolveEventAutoComplete(event, subCommandName, optionName, game);
-                case Constants.CARDS_SO -> resolveSecretObjectiveAutoComplete(event, subCommandName, optionName, game);
+                case Constants.MAP -> resolveMapAutoComplete(event, subCommandName, optionName, gameName);
+                case Constants.CARDS_AC -> resolveActionCardDiscardAutoComplete(event, subCommandName, optionName, gameName);
+                case Constants.EXPLORE -> resolveExploreAutoComplete(event, subCommandName, optionName, gameName);
+                case Constants.STATUS -> resolveStatusAutoComplete(event, subCommandName, optionName, gameName);
+                case Constants.AGENDA -> resolveAgendaAutoComplete(event, subCommandName, optionName, gameName);
+                case Constants.EVENT -> resolveEventAutoComplete(event, subCommandName, optionName, gameName);
+                case Constants.CARDS_SO -> resolveSecretObjectiveAutoComplete(event, subCommandName, optionName, gameName);
             }
             if (event.isAcknowledged()) return;
         }
 
         // GENERIC HANDLING OF OPTIONS
-        handleOptions(event, optionName, subCommandName, game);
+        handleOptions(event, optionName, subCommandName, gameName);
         if (!event.isAcknowledged()) {
-            event.replyChoiceStrings("Unable to determine AutoComplete. Should you be in a game channel?").queue();
+            event.replyChoices(Collections.emptyList()).queue();
         }
     }
 
-    private static void handleOptions(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String optionName, String subcommandName, Game game) {
+    private static void handleOptions(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String optionName, String subcommandName, String gameName) {
         switch (optionName) {
             case Constants.COLOR -> {
                 String enteredValue = event.getFocusedOption().getValue();
@@ -279,7 +279,7 @@ public class AutoCompleteProvider {
             case Constants.PRIMARY_TILE_DIRECTION -> {
                 String enteredValue = event.getFocusedOption().getValue();
                 var values = List.of("North", "Northeast", "Southeast", "South", "Southwest", "Northwest");
-                List<Command.Choice> options =  mapTo25ChoicesThatContain(values, enteredValue);
+                List<Command.Choice> options = mapTo25ChoicesThatContain(values, enteredValue);
                 event.replyChoices(options).queue();
             }
             case Constants.CATEGORY -> {
@@ -320,8 +320,8 @@ public class AutoCompleteProvider {
             }
             case Constants.CREUSS_TOKEN_NAME -> {
                 String enteredValue = event.getFocusedOption().getValue();
-                var phases = List.of("alpha", "beta", "gamma");
-                List<Command.Choice> options = mapTo25ChoicesThatContain(phases, enteredValue);
+                var tokens = List.of("alpha", "beta", "gamma");
+                List<Command.Choice> options = mapTo25ChoicesThatContain(tokens, enteredValue);
                 event.replyChoices(options).queue();
             }
             case Constants.DECK_NAME -> {
@@ -542,14 +542,16 @@ public class AutoCompleteProvider {
                 event.replyChoices(options).queue();
             }
             case "draft_pick" -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue();
                 List<String> availablePicks = game.getMiltyDraftManager().allRemainingOptionsForActive();
                 List<Command.Choice> options = mapTo25ChoicesThatContain(availablePicks, enteredValue);
                 event.replyChoices(options).queue();
             }
             case Constants.RELIC -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
 
                 List<String> relicDeck = Mapper.getDecks().get(game.getRelicDeckID()).getNewShuffledDeck();
@@ -560,7 +562,8 @@ public class AutoCompleteProvider {
                 event.replyChoices(options).queue();
             }
             case Constants.LATEST_COMMAND -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String latestCommand;
                 if (game.isFowMode()) { //!event.getUser().getID().equals(activeMap.getGMID()); //TODO: Validate that the user running the command is the FoW GM, if so, display command.
                     latestCommand = "Game is Fog of War mode - last command is hidden.";
@@ -569,22 +572,24 @@ public class AutoCompleteProvider {
                 }
                 event.replyChoice(latestCommand, Constants.LATEST_COMMAND).queue();
             }
-            case Constants.UNDO_TO_BEFORE_COMMAND -> {
-                if (game == null) return;
+            case Constants.UNDO_TO_COMMAND -> {
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 if (game.isFowMode() && !game.getFogOfWarGMIDs().contains(event.getUser().getId())) {
                     event.replyChoiceStrings("Game is Fog of War mode - you can't see what you are undoing.").queue();
                     return;
                 }
 
-                List<Command.Choice> options = UndoService.getAllUndoSavedGames(game).entrySet().stream()
-                    .sorted(Map.Entry.<String, String>comparingByValue().reversed())
+                List<Command.Choice> options = GameUndoNameService.getUndoNamesToCommandText(game, 25).entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey(Comparator.comparing(GameUndoNameService::getUndoNumberFromFileName).reversed()))
                     .limit(25)
                     .map(entry -> new Command.Choice(StringUtils.left(entry.getValue(), 100), entry.getKey()))
-                    .collect(Collectors.toList());
+                    .toList();
                 event.replyChoices(options).queue();
             }
             case Constants.TILE_NAME, Constants.TILE_NAME_FROM, Constants.TILE_NAME_TO, Constants.HS_TILE_POSITION -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 if (game.isFowMode()) {
                     var options = mapTo25ChoicesThatContain(game.getTileMap().keySet(), enteredValue);
@@ -600,10 +605,11 @@ public class AutoCompleteProvider {
             }
             case Constants.PLANET, Constants.PLANET2, Constants.PLANET3, Constants.PLANET4, Constants.PLANET5, Constants.PLANET6 -> {
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
-                Set<String> planetIDs;
                 Map<String, String> planets = Mapper.getPlanetRepresentations();
-                if (game != null && !game.isFowMode()) {
-                    planetIDs = game.getPlanets();
+                ManagedGame managedGame = GameManager.getManagedGame(gameName);
+                if (managedGame != null && !managedGame.isFowMode()) {
+                    Game game = managedGame.getGame();
+                    Set<String> planetIDs = game.getPlanets();
                     List<Command.Choice> options = planets.entrySet().stream()
                         .filter(value -> value.getValue().toLowerCase().contains(enteredValue))
                         .filter(value -> planetIDs.isEmpty() || planetIDs.contains(value.getKey()))
@@ -622,7 +628,8 @@ public class AutoCompleteProvider {
                 }
             }
             case Constants.LEADER, Constants.LEADER_1, Constants.LEADER_2, Constants.LEADER_3, Constants.LEADER_4 -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 List<String> leaderIDs = new ArrayList<>();
                 if (game.isFowMode() || Constants.LEADER_ADD.equals(event.getSubcommandName())) {
                     leaderIDs.addAll(Mapper.getLeaders().keySet());
@@ -638,6 +645,8 @@ public class AutoCompleteProvider {
                 event.replyChoices(options).queue();
             }
             case Constants.TECH, Constants.TECH2, Constants.TECH3, Constants.TECH4 -> {
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 Map<String, TechnologyModel> techs = Mapper.getTechs().entrySet().stream()
                     .filter(entry -> game != null && game.getTechnologyDeck().contains(entry.getKey()))
@@ -651,7 +660,8 @@ public class AutoCompleteProvider {
                 event.replyChoices(options).queue();
             }
             case Constants.FACTION_COLOR, Constants.TARGET_FACTION_OR_COLOR -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 if (game.isFowMode()) {
                     List<String> factionColors = new ArrayList<>(Mapper.getFactionIDs());
@@ -678,7 +688,8 @@ public class AutoCompleteProvider {
                 }
             }
             case Constants.ABILITY, Constants.ABILITY_1, Constants.ABILITY_2, Constants.ABILITY_3, Constants.ABILITY_4, Constants.ABILITY_5 -> {
-                if (game == null) return;
+                if (!GameManager.isValid(gameName)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 Map<String, AbilityModel> abilities = new HashMap<>();
                 try {
@@ -710,12 +721,12 @@ public class AutoCompleteProvider {
         }
     }
 
-    private static void resolveActionCardDiscardAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                                @NotNull String optionName, @NotNull Game game) {
+    private static void resolveActionCardDiscardAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName, @NotNull String gameName) {
         if (!optionName.equals(Constants.ACTION_CARD_ID)) return;
         switch (subCommandName) {
             case Constants.PICK_AC_FROM_DISCARD, Constants.SHUFFLE_AC_BACK_INTO_DECK -> {
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 Map<String, Integer> discardActionCardIDs = game.getDiscardActionCards();
                 List<Command.Choice> options = discardActionCardIDs.entrySet().stream()
                     .map(entry -> Map.entry(Mapper.getActionCard(entry.getKey()), entry.getValue()))
@@ -731,7 +742,7 @@ public class AutoCompleteProvider {
     }
 
     private static void resolveDeveloperCommandAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                            @NotNull String optionName) {
+        @NotNull String optionName) {
         if (!subCommandName.equals(Constants.SET_SETTING)) return;
         switch (optionName) {
             case Constants.SETTING_TYPE -> event.replyChoiceStrings("string", "number", "bool").queue();
@@ -745,7 +756,7 @@ public class AutoCompleteProvider {
     }
 
     private static void resolveSearchCommandAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                            @NotNull String optionName) {
+        @NotNull String optionName) {
         if (!optionName.equals(Constants.SEARCH)) return;
         ComponentSource source = ComponentSource.fromString(event.getOption(Constants.SOURCE, null, OptionMapping::getAsString));
         List<Command.Choice> options = null;
@@ -770,8 +781,7 @@ public class AutoCompleteProvider {
         event.replyChoices(Objects.requireNonNullElse(options, Collections.emptyList())).queue();
     }
 
-    private static void resolveFrankenAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                    @NotNull String optionName) {
+    private static void resolveFrankenAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName) {
         switch (subCommandName) {
             case Constants.FACTION_TECH_ADD, Constants.FACTION_TECH_REMOVE -> {
                 switch (optionName) {
@@ -798,8 +808,7 @@ public class AutoCompleteProvider {
         }
     }
 
-    private static void resolveMapAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                @NotNull String optionName, @NotNull Game game) {
+    private static void resolveMapAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName, @NotNull String gameName) {
         switch (subCommandName) {
             case Constants.ADD_TILE -> {
                 if (!optionName.equals(Constants.TILE_NAME)) return;
@@ -808,6 +817,7 @@ public class AutoCompleteProvider {
             }
             case Constants.REMOVE_TILE -> {
                 if (!optionName.equals(Constants.POSITION)) return;
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 List<Command.Choice> options = game.getTileMap().entrySet().stream()
                     .filter(entry -> entry.getValue().search(enteredValue))
@@ -825,9 +835,10 @@ public class AutoCompleteProvider {
         }
     }
 
-    private static void resolveEventAutoComplete(CommandAutoCompleteInteractionEvent event, String subCommandName, String optionName, Game game) {
+    private static void resolveEventAutoComplete(CommandAutoCompleteInteractionEvent event, String subCommandName, String optionName, String gameName) {
         if (!subCommandName.equals(Constants.EVENT_PLAY)) return;
         if (!optionName.equals(Constants.EVENT_ID)) return;
+        Game game = GameManager.getManagedGame(gameName).getGame();
         Player player = CommandHelper.getPlayerFromGame(game, event.getMember(), event.getUser().getId());
         String enteredValue = event.getFocusedOption().getValue().toLowerCase();
         Map<String, Integer> techs = new HashMap<>(player.getEvents());
@@ -839,14 +850,16 @@ public class AutoCompleteProvider {
         event.replyChoices(options).queue();
     }
 
-    private static void resolveExploreAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                    @NotNull String optionName, @NotNull Game game) {
+    private static void resolveExploreAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName, @NotNull String gameName) {
         if (!subCommandName.equals(Constants.USE)) return;
         if (!optionName.equals(Constants.EXPLORE_CARD_ID)) return;
-        if (game.isFowMode()) {
+        ManagedGame managedGame = GameManager.getManagedGame(gameName);
+        if (managedGame.isFowMode()) {
             event.replyChoice("You can not see the autocomplete in Fog of War", "[error]").queue();
             return;
         }
+
+        Game game = managedGame.getGame();
         String enteredValue = event.getFocusedOption().getValue().toLowerCase();
         List<String> explores = game.getAllExplores();
         List<Command.Choice> options = explores.stream()
@@ -859,8 +872,7 @@ public class AutoCompleteProvider {
         event.replyChoices(options).queue();
     }
 
-    private static void resolveStatusAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                    @NotNull String optionName, @NotNull Game game) {
+    private static void resolveStatusAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName, @NotNull String gameName) {
         if (!subCommandName.equals(Constants.SHUFFLE_OBJECTIVE_BACK) &&
             !subCommandName.equals(Constants.SCORE_OBJECTIVE) &&
             !subCommandName.equals(Constants.UNSCORE_OBJECTIVE)) {
@@ -870,6 +882,7 @@ public class AutoCompleteProvider {
             return;
         }
         String enteredValue = event.getFocusedOption().getValue().toLowerCase();
+        Game game = GameManager.getManagedGame(gameName).getGame();
         List<Command.Choice> options = game.getRevealedPublicObjectives().entrySet().stream()
             .filter(entry -> (entry.getValue() + entry.getKey()).toLowerCase().contains(enteredValue))
             .sorted(Map.Entry.comparingByValue())
@@ -879,13 +892,13 @@ public class AutoCompleteProvider {
         event.replyChoices(options).queue();
     }
 
-    private static void resolveAgendaAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                    @NotNull String optionName, @NotNull Game game) {
+    private static void resolveAgendaAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName, @NotNull String gameName) {
         if (!Constants.AGENDA_ID.equals(optionName)) {
             return;
         }
         switch (subCommandName) {
             case Constants.ADD_LAW, Constants.PUT_DISCARD_BACK_INTO_DECK -> { // Agendas in Discard
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 List<Command.Choice> options = game.getDiscardAgendas().entrySet().stream()
                     .filter(entry -> (entry.getValue() + entry.getKey()).toLowerCase().contains(enteredValue))
@@ -896,6 +909,7 @@ public class AutoCompleteProvider {
                 event.replyChoices(options).queue();
             }
             case Constants.REVISE_LAW, Constants.ADD_CONTROL_TOKEN, Constants.REMOVE_LAW -> { // Agendas In Play
+                Game game = GameManager.getManagedGame(gameName).getGame();
                 String enteredValue = event.getFocusedOption().getValue().toLowerCase();
                 List<Command.Choice> options = game.getLaws().entrySet().stream()
                     .filter(entry -> (entry.getValue() + entry.getKey()).toLowerCase().contains(enteredValue))
@@ -908,9 +922,9 @@ public class AutoCompleteProvider {
         }
     }
 
-    private static void resolveSecretObjectiveAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName,
-                                                            @NotNull String optionName, @NotNull Game game) {
+    private static void resolveSecretObjectiveAutoComplete(@NotNull CommandAutoCompleteInteractionEvent event, @NotNull String subCommandName, @NotNull String optionName, @NotNull String gameName) {
         if (!Constants.SECRET_OBJECTIVE_ID.equals(optionName) && !Constants.SO_ID.equals(optionName)) return;
+        Game game = GameManager.getManagedGame(gameName).getGame();
         Player player = CommandHelper.getPlayerFromGame(game, event.getMember(), event.getUser().getId());
         if (player == null) return;
         switch (subCommandName) {

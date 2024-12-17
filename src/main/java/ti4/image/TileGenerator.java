@@ -1,6 +1,12 @@
 package ti4.image;
 
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -19,11 +25,12 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
-import net.dv8tion.jda.api.utils.FileUpload;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
+import net.dv8tion.jda.api.utils.FileUpload;
 import ti4.ResourceHelper;
 import ti4.commands2.CommandHelper;
 import ti4.helpers.ButtonHelper;
@@ -67,21 +74,23 @@ public class TileGenerator {
     private final int context;
     private final String focusTile;
     private final DisplayType displayType;
-    private final boolean allEyesOnMe;
 
     public TileGenerator(@NotNull Game game, @NotNull GenericInteractionCreateEvent event, DisplayType displayType) {
-        this(game, event, displayType, 0, "000");
+        this(game, event, displayType, 0, "000", null);
     }
 
     public TileGenerator(@NotNull Game game, @NotNull GenericInteractionCreateEvent event, @Nullable DisplayType displayType, int context, @NotNull String focusTile) {
+        this(game, event, displayType, context, focusTile, null);
+    }
+
+    public TileGenerator(@NotNull Game game, @NotNull GenericInteractionCreateEvent event, @Nullable DisplayType displayType, int context, @NotNull String focusTile, @Nullable Player fowPlayer) {
         this.game = game;
         this.event = event;
         this.displayType = displayType;
         this.context = context;
         this.focusTile = focusTile;
         isFoWPrivate = isFowModeActive();
-        fowPlayer = CommandHelper.getPlayerFromGame(game, event.getMember(), event.getUser().getId());
-        allEyesOnMe = displayType != null && displayType.equals(DisplayType.googly);
+        this.fowPlayer = fowPlayer != null ? fowPlayer : CommandHelper.getPlayerFromGame(game, event.getMember(), event.getUser().getId());
     }
 
     private boolean isFowModeActive() {
@@ -1514,6 +1523,9 @@ public class TileGenerator {
             if (tokenPath == null) {
                 BotLogger.log("Could not parse token file for: " + tokenID);
                 continue;
+            }
+            if (game.isCptiExploreMode() && tokenPath.toLowerCase().contains("token_frontier")) {
+                tokenPath = tokenPath.replace("token_frontier", "token_frontier_cpti");
             }
 
             BufferedImage tokenImage = ImageHelper.read(tokenPath);

@@ -27,6 +27,7 @@ import ti4.model.TechnologyModel;
 import ti4.model.TileModel;
 import ti4.model.UnitModel;
 import ti4.service.combat.CombatRollType;
+import ti4.service.emoji.CardEmojis;
 
 public class CombatModHelper {
 
@@ -126,7 +127,7 @@ public class CombatModHelper {
                 && checkModPassesCondition(relevantMod.get(), tile, player, opponent, unitsByQuantity,
                     game)) {
                 modifiers
-                    .add(new NamedCombatModifierModel(relevantMod.get(), Emojis.Agenda + " " + agenda.getName()));
+                    .add(new NamedCombatModifierModel(relevantMod.get(), CardEmojis.Agenda + " " + agenda.getName()));
             }
         }
 
@@ -139,10 +140,7 @@ public class CombatModHelper {
             if (relevantMod.isPresent()
                 && checkModPassesCondition(relevantMod.get(), tile, player, opponent, unitsByQuantity,
                     game)) {
-                modifiers.add(
-                    new NamedCombatModifierModel(relevantMod.get(),
-                        Emojis.getEmojiFromDiscord(unit.getBaseType()) + " "
-                            + unit.getName() + " " + unit.getAbility()));
+                modifiers.add(new NamedCombatModifierModel(relevantMod.get(), unit.getUnitEmoji() + " " + unit.getName() + " " + unit.getAbility()));
             }
         }
 
@@ -178,7 +176,7 @@ public class CombatModHelper {
     }
 
     public static Integer getCombinedModifierForUnit(UnitModel unit, Integer numOfUnit, List<NamedCombatModifierModel> modifiers, Player player,
-                                                     Player opponent, Game game, List<UnitModel> playerUnits, CombatRollType rollType, Tile tile) {
+        Player opponent, Game game, List<UnitModel> playerUnits, CombatRollType rollType, Tile tile) {
         int modsValue = 0;
         for (NamedCombatModifierModel namedModifier : modifiers) {
             CombatModifierModel modifier = namedModifier.getModifier();
@@ -209,7 +207,7 @@ public class CombatModHelper {
         switch (condition) {
             case Constants.MOD_OPPONENT_TEKKLAR_PLAYER_OWNER -> {
                 if (opponent != null
-                    && player.getPromissoryNotesOwned().stream().anyMatch("tekklar"::equals)) {
+                    && (player.getPromissoryNotesOwned().stream().anyMatch("tekklar"::equals) || player.getPromissoryNotesOwned().stream().anyMatch("sigma_tekklar_legion"::equals))) {
                     meetsCondition = opponent.getTempCombatModifiers().stream().anyMatch(
                         mod -> "tekklar".equals(mod.getRelatedID())
                             && mod.getRelatedType().equals(Constants.PROMISSORY_NOTES))
@@ -357,9 +355,21 @@ public class CombatModHelper {
                 }
             }
             case "naazFS" -> {
-                if (ButtonHelper.doesPlayerHaveFSHere("naaz_flagship", player,
-                    game.getTileByPosition(game.getActiveSystem()))) {
+                if (ButtonHelper.doesPlayerHaveFSHere("naaz_flagship", player, game.getTileByPosition(game.getActiveSystem()))
+                        || ButtonHelper.doesPlayerHaveFSHere("sigma_naazrokha_flagship_2", player, game.getTileByPosition(game.getActiveSystem()))) {
                     meetsCondition = true;
+                }
+            }
+            case "sigma_argent_flagship_1" ->
+            {
+                meetsCondition = ButtonHelper.doesPlayerHaveFSHere("sigma_argent_flagship_1", player, game.getTileByPosition(game.getActiveSystem()));
+            }
+            case "sigma_argent_flagship_2" ->
+            {
+                meetsCondition = ButtonHelper.doesPlayerHaveFSHere("sigma_argent_flagship_2", player, tile);
+                for (String adjPos : FoWHelper.getAdjacentTilesAndNotThisTile(game, tile.getPosition(), player, false))
+                {
+                    meetsCondition |= ButtonHelper.doesPlayerHaveFSHere("sigma_argent_flagship_2", player, game.getTileByPosition(adjPos));
                 }
             }
             default -> meetsCondition = true;
@@ -368,7 +378,7 @@ public class CombatModHelper {
     }
 
     public static Integer getVariableModValue(CombatModifierModel mod, Player player, Player opponent, Game game,
-                                                UnitModel origUnit, Tile activeSystem) {
+        UnitModel origUnit, Tile activeSystem) {
         double value = mod.getValue().doubleValue();
         double multiplier = 1.0;
         long scalingCount = 0;
@@ -417,6 +427,9 @@ public class CombatModHelper {
                 }
                 case Constants.MOD_OPPONENT_NON_FIGHTER_SHIP -> {
                     scalingCount += ButtonHelper.checkNumberNonFighterShips(opponent, activeSystem);
+                }
+                case Constants.MOD_OPPONENT_SHIP -> {
+                    scalingCount += ButtonHelper.checkNumberShips(opponent, activeSystem);
                 }
                 case "combat_round" -> {
                     int round;

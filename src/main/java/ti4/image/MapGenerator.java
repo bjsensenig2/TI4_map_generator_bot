@@ -1,17 +1,21 @@
 package ti4.image;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
+import java.awt.Stroke;
 import java.awt.color.ColorSpace;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorConvertOp;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,17 +33,18 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
-import net.dv8tion.jda.api.entities.Activity;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
-import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.utils.FileUpload;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.StopWatch;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.utils.FileUpload;
 import ti4.AsyncTI4DiscordBot;
 import ti4.ResourceHelper;
 import ti4.commands2.CommandHelper;
@@ -55,7 +60,6 @@ import ti4.helpers.FoWHelper;
 import ti4.helpers.Helper;
 import ti4.helpers.RandomHelper;
 import ti4.helpers.Storage;
-import ti4.helpers.StringHelper;
 import ti4.helpers.TIGLHelper.TIGLRank;
 import ti4.helpers.Units.UnitKey;
 import ti4.helpers.Units.UnitType;
@@ -84,38 +88,30 @@ import ti4.model.Source.ComponentSource;
 import ti4.model.StrategyCardModel;
 import ti4.model.TechnologyModel;
 import ti4.model.UnitModel;
-import ti4.service.fow.FowConstants;
 import ti4.service.fow.UserOverridenSlashCommandInteractionEvent;
+import ti4.service.image.FileUploadService;
+import ti4.service.user.AFKService;
 import ti4.settings.GlobalSettings;
 import ti4.website.WebsiteOverlay;
-
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import static ti4.image.ImageHelper.writeCompressedFormat;
 
 public class MapGenerator implements AutoCloseable {
 
     private static final int RING_MAX_COUNT = 8;
     private static final int RING_MIN_COUNT = 3;
-    private static final int PLAYER_STATS_HEIGHT = 650;
+    private static final int PLAYER_STATS_HEIGHT = 650; // + 34 per teammate + 34 if line is long
     private static final int TILE_PADDING = 100;
     private static final int EXTRA_X = 300;
     private static final int EXTRA_Y = 200;
     private static final int SPACING_BETWEEN_OBJECTIVE_TYPES = 10;
-    //private static final BasicStroke stroke1 = new BasicStroke(1.0f);
     private static final BasicStroke stroke2 = new BasicStroke(2.0f);
     private static final BasicStroke stroke3 = new BasicStroke(3.0f);
     private static final BasicStroke stroke4 = new BasicStroke(4.0f);
     private static final BasicStroke stroke5 = new BasicStroke(5.0f);
     private static final BasicStroke stroke6 = new BasicStroke(6.0f);
-    private static final BasicStroke stroke8 = new BasicStroke(8.0f);
     private static final Color EliminatedColor = new Color(150, 0, 24); // Carmine
     private static final Color ActiveColor = new Color(80, 200, 120); // Emerald
     private static final Color PassedColor = new Color(220, 20, 60); // Crimson
-    //private static final Color DummyColor = new Color(0, 128, 255); // Azure
     private static final Color Stage1RevealedColor = new Color(230, 126, 34);
-    //private static final Color Stage1HiddenColor = new Color(130, 70, 0);
-    //private static final Color Stage2RevealedColor = new Color(93, 173, 226);
-    //private static final Color Stage2HiddenColor = new Color(30, 60, 128);
     private static final Color LawColor = new Color(228, 255, 0);
     private static final Color TradeGoodColor = new Color(241, 176, 0);
 
@@ -130,7 +126,6 @@ public class MapGenerator implements AutoCloseable {
     private final int width;
     private final int height;
     private final int heightForGameInfo;
-    private final boolean extraRow;
     private final boolean allEyesOnMe;
 
     private final List<WebsiteOverlay> websiteOverlays = new ArrayList<>();
@@ -179,10 +174,6 @@ public class MapGenerator implements AutoCloseable {
 
         int mapHeight = getMapHeight(game);
         mapWidth = getMapWidth(game);
-        extraRow = (mapHeight - EXTRA_Y) < (playerCountForMap / 2 * PLAYER_STATS_HEIGHT + EXTRA_Y);
-        if (extraRow) {
-            mapWidth += EXTRA_X;
-        }
         switch (this.displayType) {
             case stats:
                 heightForGameInfo = 40;
@@ -227,7 +218,7 @@ public class MapGenerator implements AutoCloseable {
     private static int getHeightStats(Game game, int playerCountForMap, int objectivesY) {
         int playerY = playerCountForMap * 340;
         int unrealPlayers = game.getNotRealPlayers().size();
-        playerY += unrealPlayers * 26;
+        playerY += unrealPlayers * 36;
         for (Player player : game.getPlayers().values()) {
             if (player.isEliminated()) {
                 playerY -= 190;
@@ -236,6 +227,7 @@ public class MapGenerator implements AutoCloseable {
             } else if (player.getSecretsScored().size() > 4) {
                 playerY += (player.getSecretsScored().size() - 4) * 43 + 23;
             }
+            playerY += (player.getTeamMateIDs().size() - 1) * 35;
         }
 
         int lawsY = (game.getLaws().size() / 2 + 1) * 115;
@@ -256,7 +248,7 @@ public class MapGenerator implements AutoCloseable {
         if (debug) debugDiscordTime = StopWatch.createStarted();
         AsyncTI4DiscordBot.jda.getPresence().setActivity(Activity.playing(game.getName()));
         game.incrementMapImageGenerationCount();
-        FileUpload fileUpload = createFileUpload(mainImage, 0.25f, game.getName());
+        FileUpload fileUpload = FileUploadService.createFileUpload(mainImage, 0.25f, game.getName());
         if (debug) debugDiscordTime.stop();
         return fileUpload;
     }
@@ -417,121 +409,6 @@ public class MapGenerator implements AutoCloseable {
         }
     }
 
-    public static FileUpload createFileUpload(BufferedImage imageToUpload, float compressionQuality, String filenamePrefix) {
-        if (imageToUpload == null) return null;
-
-        String saveLocalFormat = System.getenv("SAVE_LOCAL_FORMAT");
-        if (saveLocalFormat != null) {
-            try {
-                File file = new File(filenamePrefix + "." + saveLocalFormat);
-                ImageIO.write(imageToUpload, saveLocalFormat, file);
-            } catch (IOException e) {
-                BotLogger.log("Could not create File for " + filenamePrefix + "." + saveLocalFormat, e);
-            }
-        }
-
-        FileUpload fileUpload = null;
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            BufferedImage mapWithoutTransparentBackground = ImageHelper.redrawWithoutAlpha(imageToUpload);
-            // TODO: Use webp one day, ImageHelper.writeWebpOrDefaultTo
-            String format = "jpg";
-            String fileName = filenamePrefix + "_" + getTimeStamp() + "." + format;
-            writeCompressedFormat(mapWithoutTransparentBackground, out, format, compressionQuality);
-            fileUpload = FileUpload.fromData(out.toByteArray(), fileName);
-        } catch (IOException e) {
-            BotLogger.log("Could not create FileUpload for " + filenamePrefix, e);
-        }
-        return fileUpload;
-    }
-
-    @NotNull
-    public static String getTimeStamp() {
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy.MM.dd - HH.mm.ss");
-        return ZonedDateTime.now(ZoneOffset.UTC).format(fmt);
-    }
-
-    public static void drawBanner(Player player) {
-        Graphics bannerG;
-        BufferedImage bannerImage = new BufferedImage(325, 50, BufferedImage.TYPE_INT_ARGB);
-        BufferedImage backgroundImage = ImageHelper.readScaled(ResourceHelper.getInstance().getExtraFile("factionbanner_background.png"), 325, 50);
-        String pnColorFile = "pa_pn_color_" + Mapper.getColorID(player.getColor()) + ".png";
-        BufferedImage colorImage = ImageHelper.readScaled(ResourceHelper.getInstance().getPAResource(pnColorFile), 1.5f);
-        BufferedImage gradientImage = ImageHelper.read(ResourceHelper.getInstance().getExtraFile("factionbanner_gradient.png"));
-        BufferedImage smallFactionImage = DrawingUtil.getPlayerFactionIconImageScaled(player, 0.26f);
-        BufferedImage largeFactionImage = DrawingUtil.getPlayerFactionIconImageScaled(player, 1.4f);
-        bannerG = bannerImage.getGraphics();
-
-        bannerG.drawImage(backgroundImage, 0, 0, null);
-        Graphics2D bannerG2d = (Graphics2D) bannerG;
-        bannerG2d.rotate(Math.toRadians(-90));
-        bannerG2d.drawImage(colorImage, -60, 0, null);
-        bannerG2d.rotate(Math.toRadians(90));
-        bannerG2d.drawImage(gradientImage, 0, 0, null);
-        bannerG2d.drawImage(smallFactionImage, 2, 24, null);
-        bannerG.drawImage(largeFactionImage, 180, -42, null);
-        bannerG.setFont(Storage.getFont16());
-        bannerG.setColor(Color.WHITE);
-
-        String name = player.bannerName();
-        DrawingUtil.superDrawString(bannerG, name, 29, 44, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Bottom, stroke2, Color.BLACK);
-        int mod = 0;
-        if (player.getInitiative() > 9) {
-            mod = 13;
-        }
-        DrawingUtil.superDrawString(bannerG, "#" + player.getInitiative(), 300 - mod, 44, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Bottom, stroke2, Color.BLACK);
-
-        String turnOrdinal = StringHelper.ordinal(player.getInRoundTurnCount());
-        String descr = player.getFlexibleDisplayName() + "'s " + turnOrdinal + " turn";
-        FileUpload fileUpload = createFileUpload(bannerImage, 1.0f, player.getFaction() + player.getColor() + "banner").setDescription(descr);
-        MessageHelper.sendFileUploadToChannel(player.getCorrectChannel(), fileUpload);
-    }
-
-    public static void drawAgendaBanner(int num, Game game) {
-        Graphics bannerG;
-        BufferedImage bannerImage = new BufferedImage(225, 50, BufferedImage.TYPE_INT_ARGB);
-        BufferedImage backgroundImage = ImageHelper.readScaled(ResourceHelper.getInstance().getExtraFile("factionbanner_background.png"), 325, 50);
-        BufferedImage agendaImage = ImageHelper.readScaled(ResourceHelper.getInstance().getExtraFile("agenda.png"), 50, 50);
-        String pnColorFile = "pa_pn_color_" + Mapper.getColorID("blue") + ".png";
-        BufferedImage colorImage = ImageHelper.readScaled(ResourceHelper.getInstance().getPAResource(pnColorFile), 1.5f);
-        BufferedImage gradientImage = ImageHelper.read(ResourceHelper.getInstance().getExtraFile("factionbanner_gradient.png"));
-        bannerG = bannerImage.getGraphics();
-
-        bannerG.drawImage(backgroundImage, 0, 0, null);
-
-        Graphics2D bannerG2d = (Graphics2D) bannerG;
-        bannerG2d.rotate(Math.toRadians(-90));
-        bannerG2d.drawImage(colorImage, -60, 0, null);
-        bannerG2d.rotate(Math.toRadians(90));
-        bannerG2d.drawImage(gradientImage, 0, 0, null);
-        bannerG.drawImage(agendaImage, 0, 0, null);
-        bannerG.setFont(Storage.getFont28());
-        bannerG.setColor(Color.WHITE);
-
-        DrawingUtil.superDrawString(bannerG, "Agenda #" + num, 55, 35, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Bottom, stroke2, Color.BLACK);
-
-        FileUpload fileUpload = createFileUpload(bannerImage, 1.0f, "agenda" + num + "banner");
-        MessageHelper.sendFileUploadToChannel(game.getActionsChannel(), fileUpload);
-    }
-
-    public static void drawPhaseBanner(String phase, int round, TextChannel channel) {
-        BufferedImage bannerImage = new BufferedImage(511, 331, BufferedImage.TYPE_INT_ARGB);
-        BufferedImage backgroundImage = ImageHelper.readScaled(ResourceHelper.getInstance().getExtraFile(phase + "banner.png"), 511, 331);
-
-        Graphics bannerG = bannerImage.getGraphics();
-        bannerG.drawImage(backgroundImage, 0, 0, null);
-        bannerG.setFont(Storage.getFont48());
-        bannerG.setColor(Color.WHITE);
-        DrawingUtil.superDrawString(bannerG, phase.toUpperCase() + " PHASE", 255, 110, Color.WHITE, HorizontalAlign.Center, VerticalAlign.Center, stroke8, Color.BLACK);
-        bannerG.setFont(Storage.getFont32());
-
-        String roundText = "ROUND " + StringHelper.numberToWords(round).toUpperCase();
-        DrawingUtil.superDrawString(bannerG, roundText, 255, 221, Color.WHITE, HorizontalAlign.Center, VerticalAlign.Center, stroke6, Color.BLACK);
-
-        String descr = "Start of " + phase + " phase, round " + round + ".";
-        FileUpload fileUpload = createFileUpload(bannerImage, 1.0f, phase + round + "banner").setDescription(descr);
-        MessageHelper.sendFileUploadToChannel(channel, fileUpload);
-    }
-
     private void drawGame() {
         Map<String, Tile> tilesToDisplay = new HashMap<>(game.getTileMap());
         setupFow(tilesToDisplay);
@@ -548,7 +425,7 @@ public class MapGenerator implements AutoCloseable {
     private void drawImage() {
         graphics.setFont(Storage.getFont32());
         graphics.setColor(Color.WHITE);
-        String timeStamp = getTimeStamp();
+        String timeStamp = DateTimeHelper.getFormattedTimestamp();
         graphics.drawString(game.getName() + " " + game.getCreationDate() + " - " + timeStamp, 0, 34);
         int landscapeShift = (displayType == DisplayType.landscape ? mapWidth : 0);
         int y = heightForGameInfo + 60;
@@ -633,6 +510,8 @@ public class MapGenerator implements AutoCloseable {
             graphics.setFont(Storage.getFont32());
             int realX = x;
             Map<UnitKey, Integer> unitCount = new HashMap<>();
+
+            // PLAYER AREAS
             for (Player player : players) {
                 if (player == null) continue;
                 int baseY = y;
@@ -646,37 +525,88 @@ public class MapGenerator implements AutoCloseable {
                     continue;
                 }
 
-                // PAINT AVATAR AND USERNAME
-                StringBuilder userName = new StringBuilder();
-                String playerName = player.getUserName();
-                boolean fowHidePlayerNames = Boolean.parseBoolean(game.getFowOption(FowConstants.HIDE_NAMES));
-                if (!fowHidePlayerNames) {
-                    graphics.drawImage(DrawingUtil.getPlayerDiscordAvatar(player), x, y + 5, null);
-                    userName.append(" ").append(playerName, 0, Math.min(playerName.length(), 20));
-                }
-                y += 34;
-                graphics.setFont(Storage.getFont32());
-                Color color = getColor(player.getColor());
-                graphics.setColor(Color.WHITE);
-
                 // PAINT FACTION OR DISPLAY NAME
-                String factionText = player.getFaction();
-                if (player.getDisplayName() != null && !"null".equals(player.getDisplayName())) {
-                    factionText = player.getDisplayName();
+                List<String> teammateIDs = new ArrayList<>(player.getTeamMateIDs());
+                teammateIDs.remove(player.getUserID());
+                teammateIDs.addFirst(player.getUserID());
+
+                // Faction/Colour/DisplayName
+                // String factionText = player.getFactionModel() != null ? player.getFactionModel().getShortName() : player.getFaction(); //TODO use this but make it look better
+                String factionText = StringUtils.capitalize(player.getFaction());
+                if (player.getDisplayName() != null && !"null".equalsIgnoreCase(player.getDisplayName())) {
+                    factionText = player.getDisplayName(); // overwrites faction
                 }
-                if (factionText != null && !"null".equals(factionText)) {
-                    userName.append(" [").append(StringUtils.capitalize(factionText)).append("]");
+                if (factionText != null && !"null".equalsIgnoreCase(factionText)) {
+                    factionText = "[" + factionText + "]";
                 }
 
                 if (!"null".equals(player.getColor())) {
-                    userName.append(" (").append(player.getColor()).append(")");
+                    factionText += " (" + player.getColor() + ")"; // TODO: colour model display name
                 }
-                if (player.isAFK()) {
-                    userName.append(" -- AFK");
+                if ("null".equalsIgnoreCase(factionText)) {
+                    factionText = "";
                 }
 
-                graphics.drawString(userName.toString(), !fowHidePlayerNames ? x + 34 : x, y);
+                Color color = getColor(player.getColor());
+
+                // Player/Teammate Names
+                for (String teammateID : teammateIDs) {
+                    User user = AsyncTI4DiscordBot.jda.getUserById(teammateID);
+
+                    int leftJustified = x;
+                    int topOfName = y + 10;
+
+                    StringBuilder userName = new StringBuilder();
+                    if (!game.hideUserNames()) {
+                        Member member = game.getGuild().getMemberById(teammateID);
+                        if (member == null) {
+                            member = AsyncTI4DiscordBot.guildPrimary.getMemberById(teammateID);
+                        }
+                        userName.append(" ");
+
+                        if (member != null) {
+                            userName.append(member.getEffectiveName());
+                        } else if (user != null) {
+                            userName.append(user.getEffectiveName());
+                        } else {
+                            userName.append(player.getUserName());
+                        }
+
+                        leftJustified += 30; // to accommodate avater
+                    }
+                    if (AFKService.userIsAFK(teammateID)) {
+                        userName.append(" -- AFK");
+                    }
+
+                    graphics.setFont(Storage.getFont32());
+                    graphics.setColor(Color.WHITE);
+                    int usernameWidth = graphics.getFontMetrics().stringWidth(userName.toString());
+                    int factionTextWidth = graphics.getFontMetrics().stringWidth(factionText);
+                    int maxWidthForPlayerNameBeforeLeaders = 715;
+
+                    if (player.getUserID().equals(teammateID)) { // "real" player, first row
+                        if (factionTextWidth + usernameWidth > maxWidthForPlayerNameBeforeLeaders) { // is a team, or too long, two lines
+                            DrawingUtil.superDrawString(graphics, factionText, x, topOfName, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Top, stroke2, Color.BLACK);
+                            y += 34;
+                            DrawingUtil.superDrawString(graphics, userName.toString(), leftJustified, topOfName + 34, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Top, stroke2, Color.BLACK);
+                        } else { // can one-line it
+                            String fullText = userName.toString() + (factionText == null ? "" : " " + factionText);
+                            DrawingUtil.superDrawString(graphics, fullText, leftJustified, topOfName, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Top, stroke2, Color.BLACK);
+                        }
+                    } else { // 2nd+ row, teammates - one-line it, just username
+                        DrawingUtil.superDrawString(graphics, userName.toString(), leftJustified, topOfName, Color.WHITE, HorizontalAlign.Left, VerticalAlign.Top, stroke2, Color.BLACK);
+                    }
+
+                    // Avatar
+                    if (!game.hideUserNames()) {
+                        graphics.drawImage(DrawingUtil.getUserDiscordAvatar(user), x, y + 5, null);
+                    }
+
+                    y += 34;
+                }
+
                 if (player.getFaction() == null || "null".equals(player.getColor()) || player.getColor() == null) {
+                    y += 2;
                     continue;
                 }
 
@@ -804,7 +734,7 @@ public class MapGenerator implements AutoCloseable {
                     g2.translate(x + 47 - 3, y + 47 - 6);
                     g2.rotate(-Math.PI / 4);
                     g2.setFont(Storage.getFont20());
-                    DrawingUtil.superDrawString(g2, "ELIMINATED", 0, 0, EliminatedColor, HorizontalAlign.Center, VerticalAlign.Center, stroke4, Color.BLACK);
+                    DrawingUtil.superDrawString(g2, "DUMMY", 0, 0, EliminatedColor, HorizontalAlign.Center, VerticalAlign.Center, stroke4, Color.BLACK);
                     g2.setTransform(transform);
                 } else if (player.isPassed()) {
                     AffineTransform transform = g2.getTransform();
@@ -822,6 +752,7 @@ public class MapGenerator implements AutoCloseable {
                     g2.setTransform(transform);
                 }
 
+                // Eliminated Rectangle
                 g2.setStroke(stroke5);
                 if (player.isEliminated()) {
                     g2.setColor(color);
@@ -874,7 +805,7 @@ public class MapGenerator implements AutoCloseable {
                 graphics.drawString(ccCount, x + 40, y + deltaY + 40);
                 graphics.drawString("T/F/S", x + 40, y + deltaY);
 
-                // Additional FS
+                // Additional Fleet Supply
                 int additionalFleetSupply = 0;
                 if (player.hasAbility("edict")) {
                     additionalFleetSupply += player.getMahactCC().size();
@@ -904,6 +835,7 @@ public class MapGenerator implements AutoCloseable {
                 drawPAImage(x + 280, y + yDelta, pnImage);
                 graphics.drawString(Integer.toString(player.getPnCount()), x + 300, y + deltaY + 50);
 
+                // Trade Goods
                 if (game.isNomadCoin()) {
                     drawPAImage(x + 345, y + yDelta, nomadCoinImage);
                 } else {
@@ -911,6 +843,7 @@ public class MapGenerator implements AutoCloseable {
                 }
                 graphics.drawString(Integer.toString(player.getTg()), x + 360, y + deltaY + 50);
 
+                // Comms
                 drawPAImage(x + 410, y + yDelta, commoditiesImage);
                 String comms = player.getCommodities() + "/" + player.getCommoditiesTotal();
                 graphics.drawString(comms, x + 415, y + deltaY + 50);
@@ -1006,6 +939,8 @@ public class MapGenerator implements AutoCloseable {
                 if (soCount > 4) {
                     y += (soCount - 4) * 43;
                 }
+
+                // Draw Full Rect
                 g2.drawRect(realX - 5, baseY, mapWidth - realX, y - baseY);
                 y += 15;
             }
@@ -1660,10 +1595,10 @@ public class MapGenerator implements AutoCloseable {
 
         for (String pnID : ownedPNs) {
             PromissoryNoteModel promissoryNote = Mapper.getPromissoryNote(pnID);
-            if (!game.isShowOwnedPNsInPlayerArea() && promissoryNote.getFaction().isEmpty()) {
+            if (!game.isShowOwnedPNsInPlayerArea() && promissoryNote.getFaction().isEmpty() && !promissoryNote.getPlayImmediately()) {
                 continue;
             }
-            
+
             if (promissoryNote.getSource() == ComponentSource.promises_promises) {
                 drawPAImageScaled(x + deltaX + 1, y + 1, "pa_promissory_light_pp.png", 38, 28);
             } else {
@@ -1672,18 +1607,18 @@ public class MapGenerator implements AutoCloseable {
             if (game.isFrankenGame() && promissoryNote.getFaction().isPresent()) {
                 drawFactionIconImage(graphics, promissoryNote.getFaction().get(), x + deltaX - 1, y + 108, 42, 42);
             }
-            boolean greyed = false;
+            Player playerWhoHasIt = null;
             if (!game.isFowMode() && promissoryNote.getPlayArea()) {
                 found: for (Player player_ : game.getRealPlayers()) {
                     for (String pn_ : player_.getPromissoryNotesInPlayArea()) {
                         if (pn_.equals(pnID)) {
-                            greyed = true;
+                            playerWhoHasIt = player_;
                             break found;
                         }
                     }
                 }
             }
-            graphics.setColor(greyed ? Color.GRAY : Color.WHITE);
+            graphics.setColor(playerWhoHasIt != null ? Color.GRAY : Color.WHITE);
 
             if (pnID.equals("dspntnel")) { // for some reason "Plots Within Plots" gets cut off weirdly if handled normally
                 graphics.setFont(Storage.getFont16());
@@ -1696,6 +1631,7 @@ public class MapGenerator implements AutoCloseable {
                 drawOneOrTwoLinesOfTextVertically(graphics, promissoryNote.getShortName(), x + deltaX + 7, y + 144, 120);
             }
             drawRectWithOverlay(g2, x + deltaX - 2, y - 2, 44, 152, promissoryNote);
+            DrawingUtil.drawPlayerFactionIconImageOpaque(g2, playerWhoHasIt, x + deltaX - 1, y + 25, 42, 42, 0.5f);
 
             deltaX += 48;
             addedPNs = true;
@@ -1763,7 +1699,7 @@ public class MapGenerator implements AutoCloseable {
                 if (numInReinforcements < 0 && game.isCcNPlasticLimit()) {
                     String warningMessage = player.getRepresentation() + " is exceeding unit plastic or cardboard limits for " + unitName + ". Use buttons to remove";
                     List<Button> removeButtons = ButtonHelperModifyUnits.getRemoveThisTypeOfUnitButton(player, game, unitKey.asyncID());
-                    MessageHelper.sendMessageToChannel(player.getCorrectChannel(), warningMessage, removeButtons);
+                    MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(), warningMessage, removeButtons);
                 }
 
                 if (numInReinforcements > -10) {
@@ -2154,43 +2090,45 @@ public class MapGenerator implements AutoCloseable {
         }
 
         Tile homeTile = player.getHomeSystemTile();
-        if (homeTile.getTileID().equals("51")) {
-            Tile creussGate = game.getTile("17");
-            if (creussGate != null) {
-                homeTile = creussGate;
+        if (homeTile != null) {
+            if (homeTile.getTileID().equals("51")) {
+                Tile creussGate = game.getTile("17");
+                if (creussGate != null) {
+                    homeTile = creussGate;
+                }
             }
+            Point homePosition = PositionMapper.getTilePosition(homeTile.getPosition());
+            Comparator<String> planetComparator = (planet1, planet2) -> {
+                Tile tile1 = game.getTileFromPlanet(planet1);
+                if (tile1.getTileID().equals("51")) {
+                    Tile creussGate = game.getTile("17");
+                    if (creussGate != null) {
+                        tile1 = creussGate;
+                    }
+                }
+                Point position1 = PositionMapper.getTilePosition(tile1.getPosition());
+                int distance1 = ((homePosition.x - position1.x) * (homePosition.x - position1.x)
+                    + (homePosition.y - position1.y) * (homePosition.y - position1.y)) / 4000;
+                Tile tile2 = game.getTileFromPlanet(planet2);
+                if (tile2.getTileID().equals("51")) {
+                    Tile creussGate = game.getTile("17");
+                    if (creussGate != null) {
+                        tile2 = creussGate;
+                    }
+                }
+                Point position2 = PositionMapper.getTilePosition(tile2.getPosition());
+                int distance2 = ((homePosition.x - position2.x) * (homePosition.x - position2.x)
+                    + (homePosition.y - position2.y) * (homePosition.y - position2.y)) / 4000;
+                if (distance1 != distance2) {
+                    return distance1 - distance2;
+                }
+                if (!tile1.getPosition().equalsIgnoreCase(tile2.getPosition())) {
+                    return tile2.getPosition().compareToIgnoreCase(tile1.getPosition());
+                }
+                return planet1.compareToIgnoreCase(planet2);
+            };
+            realPlanets.sort(planetComparator);
         }
-        Point homePosition = PositionMapper.getTilePosition(homeTile.getPosition());
-        Comparator<String> planetComparator = (planet1, planet2) -> {
-            Tile tile1 = game.getTileFromPlanet(planet1);
-            if (tile1.getTileID().equals("51")) {
-                Tile creussGate = game.getTile("17");
-                if (creussGate != null) {
-                    tile1 = creussGate;
-                }
-            }
-            Point position1 = PositionMapper.getTilePosition(tile1.getPosition());
-            int distance1 = ((homePosition.x - position1.x) * (homePosition.x - position1.x)
-                + (homePosition.y - position1.y) * (homePosition.y - position1.y)) / 4000;
-            Tile tile2 = game.getTileFromPlanet(planet2);
-            if (tile2.getTileID().equals("51")) {
-                Tile creussGate = game.getTile("17");
-                if (creussGate != null) {
-                    tile2 = creussGate;
-                }
-            }
-            Point position2 = PositionMapper.getTilePosition(tile2.getPosition());
-            int distance2 = ((homePosition.x - position2.x) * (homePosition.x - position2.x)
-                + (homePosition.y - position2.y) * (homePosition.y - position2.y)) / 4000;
-            if (distance1 != distance2) {
-                return distance1 - distance2;
-            }
-            if (!tile1.getPosition().equalsIgnoreCase(tile2.getPosition())) {
-                return tile2.getPosition().compareToIgnoreCase(tile1.getPosition());
-            }
-            return planet1.compareToIgnoreCase(planet2);
-        };
-        realPlanets.sort(planetComparator);
 
         for (String planet : realPlanets) {
             deltaX = drawPlanetInfo(player, planet, x, y, deltaX);
@@ -2224,8 +2162,6 @@ public class MapGenerator implements AutoCloseable {
             graphics.setColor(isExhausted ? Color.GRAY : Color.WHITE);
 
             String statusOfPlanet = isExhausted ? "_exh" : "_rdy";
-            String planetFileName = "pc_planetname_" + planetName + statusOfPlanet + ".png";
-
             graphics.drawRect(x + deltaX - 2, y - 2, 52, 152);
 
             // Display planet traits
@@ -2421,6 +2357,8 @@ public class MapGenerator implements AutoCloseable {
         if (techs == null) {
             return deltaX;
         }
+        boolean zealotsHeroActive = !game.getStoredValue("zealotsHeroTechs").isEmpty();
+        List<String> zealotsTechs = Arrays.asList(game.getStoredValue("zealotsHeroTechs").split("-"));
         for (String tech : techs) {
             boolean isExhausted = exhaustedTechs.contains(tech);
             boolean isPurged = player.getPurgedTechs().contains(tech);
@@ -2439,6 +2377,12 @@ public class MapGenerator implements AutoCloseable {
             if (!techIcon.isEmpty()) {
                 String techSpec = "pa_tech_techicons_" + techIcon + techStatus;
                 drawPAImage(x + deltaX, y, techSpec);
+            }
+
+            // Zealots Hero Active
+            if (zealotsHeroActive && zealotsTechs.contains(tech)) {
+                String path = "pa_tech_techicons_zealots.png";
+                drawPAImage(x + deltaX, y, path);
             }
 
             if (techModel.getSource() == ComponentSource.absol) {
@@ -2747,6 +2691,8 @@ public class MapGenerator implements AutoCloseable {
 
         // Add unit upgrade images
         if (techs != null) {
+            boolean zealotsHeroActive = !game.getStoredValue("zealotsHeroTechs").isEmpty();
+            List<String> zealotsTechs = Arrays.asList(game.getStoredValue("zealotsHeroTechs").split("-"));
             for (String tech : techs) {
                 TechnologyModel techInformation = Mapper.getTech(tech);
                 if (!techInformation.isUnitUpgrade()) {
@@ -2762,8 +2708,49 @@ public class MapGenerator implements AutoCloseable {
                 Coord unitOffset = getUnitTechOffsets(unit.getAsyncId(), false);
                 UnitKey unitKey = Mapper.getUnitKey(unit.getAsyncId(), player.getColor());
                 drawPAUnitUpgrade(deltaX + x + unitOffset.x, y + unitOffset.y, unitKey);
+
+                if (zealotsHeroActive && zealotsTechs.contains(tech)) {
+                    String path = "pa_tech_unitsnew_zealots_" + tech + ".png";
+                    try {
+                        path = ResourceHelper.getInstance().getPAResource(path);
+                        BufferedImage img = ImageHelper.read(path);
+                        graphics.drawImage(img, deltaX + x + unitOffset.x, y + unitOffset.y, null);
+                    } catch (Exception e) {
+                        // Do Nothing
+                        BotLogger.log("Could not display active zealot tech", e);
+                    }
+                }
             }
         }
+
+        boolean zealotsHeroPurged = game.getStoredValue("zealotsHeroPurged").equals("true");
+        if (zealotsHeroPurged) {
+            for (String tech : player.getPurgedTechs()) {
+                TechnologyModel techInformation = Mapper.getTech(tech);
+                if (!techInformation.isUnitUpgrade()) {
+                    continue;
+                }
+
+                UnitModel unit = Mapper.getUnitModelByTechUpgrade(techInformation.getAlias());
+                if (unit == null) {
+                    BotLogger.log(game.getName() + " " + player.getUserName() + " Could not load unit associated with tech: " + techInformation.getAlias());
+                    continue;
+                }
+
+                Coord unitOffset = getUnitTechOffsets(unit.getAsyncId(), false);
+                UnitKey unitKey = Mapper.getUnitKey(unit.getAsyncId(), player.getColor());
+                String path = "pa_tech_unitsnew_zealotspurged_" + tech + ".png";
+                try {
+                    path = ResourceHelper.getInstance().getPAResource(path);
+                    BufferedImage img = ImageHelper.read(path);
+                    graphics.drawImage(img, deltaX + x + unitOffset.x, y + unitOffset.y, null);
+                } catch (Exception e) {
+                    // Do Nothing
+                    BotLogger.log("Could not display purged zealot tech", e);
+                }
+            }
+        }
+
         if (brokenWarSun) {
             UnitModel unit = Mapper.getUnitModelByTechUpgrade("ws");
             Coord unitOffset = getUnitTechOffsets(unit.getAsyncId(), false);
@@ -3170,7 +3157,7 @@ public class MapGenerator implements AutoCloseable {
         boolean randomizeLocation = false;
         if (fow && player != fowPlayer) {
             if (FoWHelper.canSeeStatsOfPlayer(game, player, fowPlayer)) {
-                if (!FoWHelper.hasHomeSystemInView(game, player, fowPlayer)) {
+                if (!FoWHelper.hasHomeSystemInView(player, fowPlayer)) {
                     // if we can see a players stats, but we cannot see their home system - move their stats somewhere random
                     randomizeLocation = true;
                 }
@@ -3254,7 +3241,7 @@ public class MapGenerator implements AutoCloseable {
             // always build fowplayer's stat location first
             statOrder.add(fowPlayer);
             // then build the stats of players we can see home systems
-            players.stream().filter(player -> FoWHelper.hasHomeSystemInView(game, player, fowPlayer)).forEach(statOrder::add);
+            players.stream().filter(player -> FoWHelper.hasHomeSystemInView(player, fowPlayer)).forEach(statOrder::add);
             // then build the stats of everyone else
             players.stream().filter(player -> FoWHelper.canSeeStatsOfPlayer(game, player, fowPlayer)).forEach(statOrder::add);
         }
@@ -3347,7 +3334,7 @@ public class MapGenerator implements AutoCloseable {
             graphics.setFont(Storage.getFont32());
             String userName = player.getUserName();
             point = PositionMapper.getPlayerStats("newuserName");
-            if (!Boolean.parseBoolean(game.getFowOption(FowConstants.HIDE_NAMES))) {
+            if (!game.hideUserNames()) {
                 String name = userName.substring(0, Math.min(userName.length(), 15));
                 DrawingUtil.superDrawString(graphics, name, statTileMid.x + point.x, statTileMid.y + point.y, Color.WHITE, center, null, stroke5, Color.BLACK);
             }
@@ -3916,7 +3903,7 @@ public class MapGenerator implements AutoCloseable {
 
         // PAINT USERNAME
         Point point = PositionMapper.getPlayerStats(Constants.STATS_USERNAME);
-        if (!Boolean.parseBoolean(game.getFowOption(FowConstants.HIDE_NAMES))) {
+        if (!game.hideUserNames()) {
             graphics.drawString(userName.substring(0, Math.min(userName.length(), 11)), point.x + deltaX,
                 point.y + deltaY);
         }
@@ -4092,18 +4079,40 @@ public class MapGenerator implements AutoCloseable {
         int x = 5 + (displayType == DisplayType.landscape ? mapWidth : 0);
         int maxY = y;
 
-        List<Objective> objectives = Objective.retrieve(game);
+        // Objective 1
+        List<Objective> objectives = Objective.retrievePublic1(game);
         int maxTextWidth = ObjectiveBox.getMaxTextWidth(game, graphics, objectives);
         int boxWidth = ObjectiveBox.getBoxWidth(game, maxTextWidth, scoreTokenWidth);
-        Objective.Type lastType = Objective.Type.Stage1;
 
         for (Objective objective : objectives) {
-            if (objective.type() != lastType) {
-                x += boxWidth + SPACING_BETWEEN_OBJECTIVE_TYPES;
-                maxY = Math.max(y, maxY);
-                y = top;
-                lastType = objective.type();
-            }
+            ObjectiveBox box = new ObjectiveBox(x, y, boxWidth, maxTextWidth, scoreTokenWidth);
+            box.Display(game, graphics, this, objective);
+            y += ObjectiveBox.getVerticalSpacing();
+        }
+
+        // Objective 2
+        x += boxWidth + SPACING_BETWEEN_OBJECTIVE_TYPES;
+        maxY = Math.max(y, maxY);
+        y = top;
+
+        objectives = Objective.retrievePublic2(game);
+        maxTextWidth = ObjectiveBox.getMaxTextWidth(game, graphics, objectives);
+        boxWidth = ObjectiveBox.getBoxWidth(game, maxTextWidth, scoreTokenWidth);
+        for (Objective objective : objectives) {
+            ObjectiveBox box = new ObjectiveBox(x, y, boxWidth, maxTextWidth, scoreTokenWidth);
+            box.Display(game, graphics, this, objective);
+            y += ObjectiveBox.getVerticalSpacing();
+        }
+
+        // Custom
+        x += boxWidth + SPACING_BETWEEN_OBJECTIVE_TYPES;
+        maxY = Math.max(y, maxY);
+        y = top;
+
+        objectives = Objective.retrieveCustom(game);
+        maxTextWidth = ObjectiveBox.getMaxTextWidth(game, graphics, objectives);
+        boxWidth = ObjectiveBox.getBoxWidth(game, maxTextWidth, scoreTokenWidth);
+        for (Objective objective : objectives) {
             ObjectiveBox box = new ObjectiveBox(x, y, boxWidth, maxTextWidth, scoreTokenWidth);
             box.Display(game, graphics, this, objective);
             y += ObjectiveBox.getVerticalSpacing();
@@ -4698,7 +4707,7 @@ public class MapGenerator implements AutoCloseable {
         return game.getRealPlayers().size() + game.getDummies().size();
     }
 
-    private static boolean hasExtraRow(Game game) {
+    private static boolean hasExtraRow(Game game) { // TODO: explain why this exists
         return (getMapHeight(game) - EXTRA_Y) < (getMapPlayerCount(game) / 2 * PLAYER_STATS_HEIGHT + EXTRA_Y);
     }
 

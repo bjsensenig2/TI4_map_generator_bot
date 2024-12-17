@@ -1,6 +1,6 @@
 package ti4.helpers;
 
-import java.awt.*;
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -85,6 +85,7 @@ public class Constants {
     public static final String FOW_OPTIONS = "fow_options";
     public static final String BASE_GAME_MODE = "base_game_mode";
     public static final String LIGHT_FOG_MODE = "light_fog_mode";
+    public static final String CPTI_EXPLORE_MODE = "cpti_explore_mode";
     public static final String RED_TAPE_MODE = "red_tape_mode";
     public static final String HOMEBREW_SC_MODE = "homebrew_sc_mode";
     public static final String SPIN_MODE = "spin_mode";
@@ -647,7 +648,7 @@ public class Constants {
     public static final String AGENDAS = "agendas";
     public static final String AGENDA_DECK = "agenda_deck";
     public static final String AGENDA = "agenda";
-    public static final String RELIC_SHOW_REMAINING = "show_remaining";
+    public static final String SHOW_REMAINING = "show_remaining";
     public static final String RELIC_DRAW_SPECIFIC = "draw_specific";
     public static final String DRAW = "draw";
     public static final String RELIC_DRAW = "draw";
@@ -1063,6 +1064,7 @@ public class Constants {
     public static final String MOD_UNITS_TWO_MATCHING_NOT_FF = "units_two_matching_not_ff";
     public static final String MOD_ADJACENT_MECH = "adjacent_mech";
     public static final String MOD_OPPONENT_NON_FIGHTER_SHIP = "opponent_non_fighter_ship";
+    public static final String MOD_OPPONENT_SHIP = "opponent_ship";
 
     public static final String MIGRATION_NAME = "migration_name";
     public static final String RUN_MANUAL_DATA_MIGRATION = "run_manual_data_migration";
@@ -1151,7 +1153,7 @@ public class Constants {
     public static final String GAMES_WITH_FACTIONS = "games_with_factions";
     public static final String GAME_STATISTIC = "game_statistic";
     public static final String PLAYER_STATISTIC = "player_statistic";
-    public static final String UNDO_TO_BEFORE_COMMAND = "undo_to_before_command";
+    public static final String UNDO_TO_COMMAND = "undo_to_command";
     public static final String SHOW_GAME_MODES = "show_game_modes";
     public static final String MAX_SO_COUNT = "max_so_count";
     public static final String REFRESH_RELIC_INFO = "refreshRelicInfo";

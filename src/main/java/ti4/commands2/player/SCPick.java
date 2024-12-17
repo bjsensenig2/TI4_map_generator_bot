@@ -25,7 +25,7 @@ import ti4.helpers.Constants;
 import ti4.helpers.FoWHelper;
 import ti4.helpers.Helper;
 import ti4.helpers.PromissoryNoteHelper;
-import ti4.image.MapGenerator;
+import ti4.image.BannerGenerator;
 import ti4.map.Game;
 import ti4.map.Player;
 import ti4.message.MessageHelper;
@@ -210,11 +210,11 @@ class SCPick extends GameStateSubcommand {
 
             if (!allPicked) {
                 game.setPhaseOfGame("strategy");
-                MessageHelper.sendMessageToChannelWithButtons(privatePlayer.getPrivateChannel(), "Use buttons to pick your strategy card.", Helper.getRemainingSCButtons(event, game, privatePlayer));
+                MessageHelper.sendMessageToChannelWithButtons(privatePlayer.getPrivateChannel(), "Use buttons to pick your strategy card.", Helper.getRemainingSCButtons(game, privatePlayer));
             } else {
                 privatePlayer.setInRoundTurnCount(privatePlayer.getInRoundTurnCount() + 1);
                 if (game.isShowBanners()) {
-                    MapGenerator.drawBanner(privatePlayer);
+                    BannerGenerator.drawFactionBanner(privatePlayer);
                 }
                 MessageHelper.sendMessageToChannelWithButtons(privatePlayer.getPrivateChannel(), msgExtra + "\n Use Buttons to do turn.",
                     StartTurnService.getStartOfTurnButtons(privatePlayer, game, false, event));
@@ -239,13 +239,13 @@ class SCPick extends GameStateSubcommand {
             }
             if (!allPicked) {
                 game.updateActivePlayer(privatePlayer);
-                MessageHelper.sendMessageToChannelWithButtons(event.getMessageChannel(), msgExtra + "\nUse buttons to pick your strategy card.", Helper.getRemainingSCButtons(event, game, privatePlayer));
+                MessageHelper.sendMessageToChannelWithButtons(event.getMessageChannel(), msgExtra + "\nUse buttons to pick your strategy card.", Helper.getRemainingSCButtons(game, privatePlayer));
                 game.setPhaseOfGame("strategy");
             } else {
                 MessageHelper.sendMessageToChannel(game.getMainGameChannel(), msgExtra);
                 privatePlayer.setInRoundTurnCount(privatePlayer.getInRoundTurnCount() + 1);
                 if (game.isShowBanners()) {
-                    MapGenerator.drawBanner(privatePlayer);
+                    BannerGenerator.drawFactionBanner(privatePlayer);
                 }
                 MessageHelper.sendMessageToChannelWithButtons(game.getMainGameChannel(), "\n Use Buttons to do turn.",
                     StartTurnService.getStartOfTurnButtons(privatePlayer, game, false, event));

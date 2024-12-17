@@ -1,7 +1,6 @@
 package ti4.listeners;
 
 import javax.annotation.Nonnull;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -9,23 +8,23 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.apache.commons.lang3.StringUtils;
 import ti4.AsyncTI4DiscordBot;
+import ti4.executors.ExecutorManager;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Constants;
 import ti4.helpers.async.RoundSummaryHelper;
 import ti4.image.Mapper;
 import ti4.map.Game;
-import ti4.map.GameManager;
-import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
-import ti4.map.Tile;
+import ti4.map.manage.GameManager;
+import ti4.map.manage.ManagedGame;
 import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
+import ti4.service.fow.FOWCombatThreadMirroring;
 import ti4.service.fow.WhisperService;
 import ti4.service.game.CreateGameService;
 import ti4.service.game.GameNameService;
@@ -46,17 +45,20 @@ public class MessageListener extends ListenerAdapter {
             return;
         }
 
-        AsyncTI4DiscordBot.runAsync("Message listener task", EXECUTION_TIME_WARNING_THRESHOLD_SECONDS, () -> processMessage(event, message));
+        ExecutorManager.runAsync("Message listener task", EXECUTION_TIME_WARNING_THRESHOLD_SECONDS, () -> processMessage(event, message));
     }
 
     private static void processMessage(@Nonnull MessageReceivedEvent event, Message message) {
         try {
             if (!event.getAuthor().isBot()) {
-                if (addFactionEmojiReactionsToMessages(event)) return;
-                if (handleWhispers(event, message)) return;
+                String gameName = GameNameService.getGameNameFromChannel(event.getChannel());
+                if (GameManager.isValid(gameName)) {
+                    if (handleWhispers(event, message, gameName)) return;
+                    if (endOfRoundSummary(event, message, gameName)) return;
+                    if (addFactionEmojiReactionsToMessages(event, gameName)) return;
+                }
                 if (checkForFogOfWarInvitePrompt(message)) return;
                 if (copyLFGPingsToLFGPingsChannel(event, message)) return;
-                if (endOfRoundSummary(event, message)) return;
             }
             handleFogOfWarCombatThreadMirroring(event);
         } catch (Exception e) {
@@ -105,27 +107,22 @@ public class MessageListener extends ListenerAdapter {
         return true;
     }
 
-    private static boolean endOfRoundSummary(MessageReceivedEvent event, Message message) {
+    private static boolean endOfRoundSummary(MessageReceivedEvent event, Message message, String gameName) {
         if (!message.getContentRaw().toLowerCase().startsWith("endofround")) {
             return false;
         }
-        String gameName = event.getChannel().getName();
-        gameName = gameName.replace("Cards Info-", "");
-        gameName = gameName.substring(0, gameName.indexOf("-"));
-        Game game = GameManager.getGame(gameName);
-
         String messageText = message.getContentRaw();
         String messageBeginning = StringUtils.substringBefore(messageText, " ");
         String messageContent = StringUtils.substringAfter(messageText, " ");
-        if (game != null) {
-            Player player = getPlayer(event, game);
-            RoundSummaryHelper.storeEndOfRoundSummary(game, player, messageBeginning, messageContent, true, event.getChannel());
-            GameSaveLoadManager.saveGame(game, "End of round summary.");
-        }
+
+        Game game = GameManager.getManagedGame(gameName).getGame();
+        Player player = getPlayer(event, game);
+        RoundSummaryHelper.storeEndOfRoundSummary(game, player, messageBeginning, messageContent, true, event.getChannel());
+        GameManager.save(game, "End of round summary.");
         return true;
     }
 
-    private static boolean handleWhispers(MessageReceivedEvent event, Message message) {
+    private static boolean handleWhispers(MessageReceivedEvent event, Message message, String gameName) {
         if (message.getContentRaw().contains("used /fow whisper")) {
             message.delete().queue();
         }
@@ -135,106 +132,96 @@ public class MessageListener extends ListenerAdapter {
             return false;
         }
 
+        Game game = GameManager.getManagedGame(gameName).getGame();
+        if (game == null) {
+            return true;
+        }
+        
+        //Prevent whispers from fow combat threads
+        if (game.isFowMode() && event.getChannel() instanceof ThreadChannel
+            && event.getChannel().getName().contains("vs")
+            && event.getChannel().getName().contains("private")) {
+            return false;
+        }
+
+        Player sender = getPlayer(event, game);
+        if (sender == null || !sender.isRealPlayer()) {
+            return true;
+        }
+
         String messageLowerCase = messageText.toLowerCase();
         if (messageLowerCase.startsWith("tofutureme")) {
-            whisperToFutureMe(event);
-            return false;
+            whisperToFutureMe(event, game, sender);
+            GameManager.save(game, "Whisper to future by " + sender.getUserName());
+            return true;
         }
 
-        String whoIsItTo = StringUtils.substringBetween(messageLowerCase, "to", " ");
-        boolean future = whoIsItTo.startsWith("future");
-        whoIsItTo = whoIsItTo.replaceFirst("future", "");
-        if (whoIsItTo.isEmpty()) {
-            return false;
+        String receivingColorOrFaction = StringUtils.substringBetween(messageLowerCase, "to", " ");
+        boolean future = receivingColorOrFaction.startsWith("future");
+        receivingColorOrFaction = receivingColorOrFaction.replaceFirst("future", "");
+        if (receivingColorOrFaction.isEmpty()) {
+            return true;
         }
 
-        if (!Mapper.isValidColor(whoIsItTo) && !Mapper.isValidFaction(AliasHandler.resolveFaction(whoIsItTo))) {
-            return false;
-        }
-
-        String gameName = event.getChannel().getName();
-        gameName = gameName.replace("Cards Info-", "");
-        gameName = gameName.substring(0, gameName.indexOf("-"));
-        Game game = GameManager.getGame(gameName);
-
-        if (game == null) {
-            return false;
+        receivingColorOrFaction = AliasHandler.resolveFaction(receivingColorOrFaction);
+        if (!Mapper.isValidColor(receivingColorOrFaction) && !Mapper.isValidFaction(receivingColorOrFaction)) {
+            return true;
         }
 
         String messageContent = StringUtils.substringAfter(messageText, " ");
         if (messageContent.isEmpty()) {
             message.reply("No message content?").queue();
-            return false;
+            return true;
         }
 
-        Player player = getPlayer(event, game);
-        Player player_ = game.getPlayer(event.getAuthor().getId());
-
-        if (future) {
-            whisperToFutureColorOrFaction(event, whoIsItTo, game, messageContent, player, player_);
-        } else {
-            whoIsItTo = AliasHandler.resolveFaction(whoIsItTo);
-            for (Player player3 : game.getRealPlayers()) {
-                if (Objects.equals(whoIsItTo, player3.getFaction()) ||
-                    Objects.equals(whoIsItTo, player3.getColor())) {
-                    player_ = player3;
-                    break;
-                }
-            }
-
-            //if no target player was found
-            if (Objects.equals(player, player_)) {
-                MessageHelper.sendMessageToChannel(event.getChannel(), "Player not found: " + whoIsItTo);
-                return false;
-            }
-            WhisperService.sendWhisper(game, player, player_, messageContent, "n", event.getChannel(), event.getGuild());
-            message.delete().queue();
-        }
-        return true;
-    }
-
-    private static void whisperToFutureColorOrFaction(MessageReceivedEvent event, String whoIsItTo, Game game, String messageContent, Player player, Player player_) {
-        String factionColor = whoIsItTo;
-        factionColor = AliasHandler.resolveFaction(factionColor);
-        for (Player player3 : game.getPlayers().values()) {
-            if (Objects.equals(factionColor, player3.getFaction()) ||
-                Objects.equals(factionColor, player3.getColor())) {
-                player_ = player3;
+        Player receiver = null;
+        for (Player player : game.getRealPlayers()) {
+            if (Objects.equals(receivingColorOrFaction, player.getFaction()) || Objects.equals(receivingColorOrFaction, player.getColor())) {
+                receiver = player;
                 break;
             }
         }
-        String futureMsgKey = "futureMessageFor_" + player_.getFaction() + "_" + player.getFaction();
+
+        if (receiver == null) {
+            MessageHelper.sendMessageToChannel(event.getChannel(), "Player not found: " + receivingColorOrFaction);
+            return true;
+        }
+
+        if (future) {
+            whisperToFutureColorOrFaction(event, game, messageContent, sender, receiver);
+        } else {
+            WhisperService.sendWhisper(game, sender, receiver, messageContent, "n", event.getChannel(), event.getGuild());
+            message.delete().queue();
+        }
+        GameManager.save(game, "Whisper");
+        return true;
+    }
+
+    private static void whisperToFutureColorOrFaction(MessageReceivedEvent event, Game game, String messageContent, Player sender, Player receiver) {
+        String futureMsgKey = "futureMessageFor_" + receiver.getFaction() + "_" + sender.getFaction();
         game.setStoredValue(futureMsgKey, game.getStoredValue(futureMsgKey) + "\n\n" + messageContent);
-        MessageHelper.sendMessageToChannel(event.getChannel(), player.getFactionEmoji() + " sent someone else a future message");
+        MessageHelper.sendMessageToChannel(event.getChannel(), sender.getFactionEmoji() + " sent someone else a future message");
         event.getMessage().delete().queue();
     }
 
-    private static void whisperToFutureMe(MessageReceivedEvent event) {
-        String gameName = GameNameService.getGameNameFromChannel(event.getChannel());
-        Game game = GameManager.getGame(gameName);
+    private static void whisperToFutureMe(MessageReceivedEvent event, Game game, Player player) {
         String messageContent = StringUtils.substringAfter(event.getMessage().getContentRaw(), " ");
-        Player player = getPlayer(event, game);
 
         String previousThoughts = "";
         if (!game.getStoredValue("futureMessageFor" + player.getFaction()).isEmpty()) {
             previousThoughts = game.getStoredValue("futureMessageFor" + player.getFaction()) + "\n\n";
         }
         game.setStoredValue("futureMessageFor" + player.getFaction(), previousThoughts + messageContent);
-        GameSaveLoadManager.saveGame(game, "Whisper to future.");
         MessageHelper.sendMessageToChannel(event.getChannel(), player.getFactionEmoji() + " sent themselves a future message");
         event.getMessage().delete().queue();
     }
 
-    private static boolean addFactionEmojiReactionsToMessages(MessageReceivedEvent event) {
-        if (!event.getChannel().getName().contains("-")) {
+    private static boolean addFactionEmojiReactionsToMessages(MessageReceivedEvent event, String gameName) {
+        ManagedGame managedGame = GameManager.getManagedGame(gameName);
+        if (managedGame == null || !managedGame.isFactionReactMode() || managedGame.isFowMode()) {
             return false;
         }
-        String gameName = event.getChannel().getName().substring(0, event.getChannel().getName().indexOf("-"));
-        Game game = GameManager.getGame(gameName);
-        if (game == null || !game.isBotFactionReacts() || game.isFowMode()) {
-            return false;
-        }
-        Player player = getPlayer(event, game);
+        Player player = getPlayer(event, managedGame.getGame());
         if (player == null || !player.isRealPlayer()) {
             return false;
         }
@@ -256,85 +243,13 @@ public class MessageListener extends ListenerAdapter {
     /**
      * replicate messages in combat threads so that observers can see
      */
-    private static boolean handleFogOfWarCombatThreadMirroring(MessageReceivedEvent event) {
+    private static void handleFogOfWarCombatThreadMirroring(MessageReceivedEvent event) {
         if (AsyncTI4DiscordBot.guildFogOfWar != null && // fog server exists
             !AsyncTI4DiscordBot.guildFogOfWar.getId().equals(event.getGuild().getId()) && // event server IS NOT the fog server
             AsyncTI4DiscordBot.guildPrimaryID.equals(Constants.ASYNCTI4_HUB_SERVER_ID)) {// bot is running in production
-            return false;
+            return;
         } // else it's probably a dev/test server, so execute
 
-        String messageText = event.getMessage().getContentRaw();
-        boolean isFowCombatThread = event.getChannel() instanceof ThreadChannel
-            && event.getChannel().getName().contains("vs")
-            && event.getChannel().getName().contains("private");
-        if (!isFowCombatThread) {
-            return false;
-        }
-
-        String gameName = event.getChannel().getName().substring(0, event.getChannel().getName().indexOf("-"));
-        Game game = GameManager.getGame(gameName);
-        if (!game.isFowMode()) {
-            return false;
-        }
-
-        Player player3 = game.getPlayer(event.getAuthor().getId());
-        if (game.isCommunityMode()) {
-            Collection<Player> players = game.getPlayers().values();
-            List<Role> roles = event.getMember().getRoles();
-            for (Player player2 : players) {
-                if (roles.contains(player2.getRoleForCommunity())) {
-                    player3 = player2;
-                }
-            }
-        }
-
-        boolean isPlayerInvalid = player3 == null || !player3.isRealPlayer() || !event.getChannel().getName().contains(player3.getColor());
-        boolean isBotMessage = event.getAuthor().isBot();
-        boolean isTotalHitsMessage = messageText.contains("Total hits ");
-        if ((isPlayerInvalid || isBotMessage) && (!isBotMessage || !isTotalHitsMessage)) {
-            return false;
-        }
-        if (StringUtils.countMatches(event.getChannel().getName(), "-") <= 4) {
-            return false;
-        }
-
-        String systemPos = event.getChannel().getName().split("-")[4];
-
-        Tile tile = game.getTileByPosition(systemPos);
-        for (Player player : game.getRealPlayers()) {
-            if (player3 != null && player == player3) {
-                continue;
-            }
-            if (!tile.getRepresentationForButtons(game, player).contains("(")) {
-                continue;
-            }
-            MessageChannel pChannel = player.getPrivateChannel();
-            TextChannel pChan = (TextChannel) pChannel;
-            if (pChan != null) {
-                String threadName = event.getChannel().getName();
-                boolean combatParticipant = threadName.contains("-" + player.getColor() + "-");
-                String newMessage = player.getRepresentation(true, combatParticipant) + " Someone said: " + messageText;
-                if (event.getAuthor().isBot() && messageText.contains("Total hits ")) {
-                    String hits = StringUtils.substringAfter(messageText, "Total hits ");
-                    String location = StringUtils.substringAfter(messageText, "rolls for ");
-                    location = StringUtils.substringBefore(location, " Combat");
-                    newMessage = player.getRepresentation(true, combatParticipant) + " Someone rolled dice for " + location
-                        + " and got a total of **" + hits + " hit" + (hits.equals("1") ? "" : "s");
-                }
-                if (!event.getAuthor().isBot() && player3 != null && player3.isRealPlayer()) {
-                    newMessage = player.getRepresentation(true, combatParticipant) + " "
-                        + StringUtils.capitalize(player3.getColor()) + " said: " + messageText;
-                }
-
-                newMessage = newMessage.replace("Total hits", "");
-                List<ThreadChannel> threadChannels = pChan.getThreadChannels();
-                for (ThreadChannel threadChannel_ : threadChannels) {
-                    if (threadChannel_.getName().contains(threadName) && threadChannel_ != event.getChannel()) {
-                        MessageHelper.sendMessageToChannel(threadChannel_, newMessage);
-                    }
-                }
-            }
-        }
-        return true;
+        FOWCombatThreadMirroring.mirrorEvent(event);
     }
 }

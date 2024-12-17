@@ -12,7 +12,6 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 import org.jetbrains.annotations.Nullable;
 import software.amazon.awssdk.utils.StringUtils;
 import ti4.image.Mapper;
-import ti4.helpers.Emojis;
 import ti4.model.Source.ComponentSource;
 
 @Data
@@ -125,7 +124,7 @@ public class EventModel implements ModelInterface, EmbeddableModel {
 
         StringBuilder sb = new StringBuilder();
         if (numericalID != null) sb.append("(").append(numericalID).append(") ");
-        sb.append(Emojis.EventCard).append("__**").append(getName()).append("**__").append(getSource().emoji());
+        sb.append("__**").append(getName()).append("**__").append(getSource().emoji());
         eb.setTitle(sb.toString());
 
         eb.setColor(Color.black);

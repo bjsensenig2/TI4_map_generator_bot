@@ -12,14 +12,16 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import ti4.image.Mapper;
 import ti4.helpers.AliasHandler;
-import ti4.helpers.Emojis;
 import ti4.helpers.Helper;
 import ti4.model.Source.ComponentSource;
+import ti4.service.emoji.FactionEmojis;
+import ti4.service.emoji.MiscEmojis;
 
 @Data
 public class FactionModel implements ModelInterface, EmbeddableModel {
     private String alias;
     private String factionName;
+    private String shortName;
     private String shortTag;
     private String homeSystem;
     private String startingFleet;
@@ -57,8 +59,12 @@ public class FactionModel implements ModelInterface, EmbeddableModel {
     }
 
     public String getFactionEmoji() {
-        if (homebrewReplacesID != null) return Emojis.getFactionIconFromDiscord(homebrewReplacesID);
-        return Emojis.getFactionIconFromDiscord(getAlias());
+        if (homebrewReplacesID != null) return FactionEmojis.getFactionIcon(homebrewReplacesID).toString();
+        return FactionEmojis.getFactionIcon(getAlias()).toString();
+    }
+
+    public String getShortName() {
+        return Optional.ofNullable(shortName).orElse(getFactionName().replace("The ", ""));
     }
 
     public String getShortTag() {
@@ -168,7 +174,7 @@ public class FactionModel implements ModelInterface, EmbeddableModel {
         eb.setTitle(getFactionEmoji() + " " + getFactionNameWithSourceEmoji());
 
         // DESCRIPTION - <Commodity><Commodity><Commodity>
-        eb.setDescription("\n" + Emojis.comm(getCommodities()));
+        eb.setDescription("\n" + MiscEmojis.comm(getCommodities()));
 
         // FIELDS
         // Abilities

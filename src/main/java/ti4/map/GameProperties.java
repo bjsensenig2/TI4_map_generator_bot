@@ -81,7 +81,6 @@ public class GameProperties {
     private boolean showUnitTags;
     private boolean stratPings = true;
     private boolean testBetaFeaturesMode;
-    private boolean undoButtonOffered = true;
     private boolean showOwnedPNsInPlayerArea = false;
     private String hexBorderStyle = "off";
     private String textSize = "medium";
@@ -99,6 +98,7 @@ public class GameProperties {
     private @ExportableField boolean competitiveTIGLGame;
     private @ExportableField boolean fowMode;
     private @ExportableField boolean lightFogMode;
+    private @ExportableField boolean cptiExploreMode;
     private @ExportableField boolean absolMode;
     private @ExportableField boolean discordantStarsMode;
     private @ExportableField boolean miltyModMode;

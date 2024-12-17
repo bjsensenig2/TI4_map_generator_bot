@@ -47,7 +47,6 @@ import ti4.helpers.ButtonHelper;
 import ti4.helpers.ButtonHelperAbilities;
 import ti4.helpers.ColorChangeHelper;
 import ti4.helpers.Constants;
-import ti4.helpers.Emojis;
 import ti4.helpers.FoWHelper;
 import ti4.helpers.Helper;
 import ti4.helpers.TIGLHelper.TIGLRank;
@@ -69,12 +68,14 @@ import ti4.model.SecretObjectiveModel;
 import ti4.model.TechnologyModel;
 import ti4.model.TemporaryCombatModifierModel;
 import ti4.model.UnitModel;
+import ti4.service.emoji.ColorEmojis;
+import ti4.service.emoji.FactionEmojis;
+import ti4.service.emoji.MiscEmojis;
 import ti4.service.leader.CommanderUnlockCheckService;
 import ti4.service.turn.EndTurnService;
 import ti4.service.turn.StartTurnService;
+import ti4.service.user.AFKService;
 import ti4.settings.users.UserSettingsManager;
-
-import static org.apache.commons.lang3.StringUtils.isBlank;
 
 public class Player {
 
@@ -82,7 +83,6 @@ public class Player {
     private String userName;
 
     private final Game game;
-    private boolean tenMinReminderPing;
 
     private boolean passed;
     private boolean readyToPassBag;
@@ -637,14 +637,15 @@ public class Player {
 
         // CREATE NEW THREAD
         // Make card info thread a public thread in community mode
-        boolean isPrivateChannel = (!game.isFowMode());
+        boolean isPrivateChannel = !game.isFowMode();
         if (game.getName().contains("pbd100") || game.getName().contains("pbd500")) {
             isPrivateChannel = true;
         }
-        ThreadChannelAction threadAction = actionsChannel.createThreadChannel(threadName, isPrivateChannel);
-        threadAction.setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_1_WEEK);
+        ThreadChannelAction threadAction = actionsChannel
+            .createThreadChannel(threadName, isPrivateChannel)
+            .setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_1_WEEK);
         if (isPrivateChannel) {
-            threadAction.setInvitable(false);
+            threadAction = threadAction.setInvitable(false);
         }
         if (createWithQueue) {
             threadAction.queue(c -> {
@@ -691,16 +692,8 @@ public class Player {
         autoPassOnWhensAfters = preference;
     }
 
-    public boolean shouldPlayerBeTenMinReminded() {
-        return tenMinReminderPing;
-    }
-
     public void setReadyToPassBag(boolean passed) {
         readyToPassBag = passed;
-    }
-
-    public void setWhetherPlayerShouldBeTenMinReminded(boolean tenMinReminderPing) {
-        this.tenMinReminderPing = tenMinReminderPing;
     }
 
     public Set<String> getAbilities() {
@@ -1351,6 +1344,11 @@ public class Player {
     }
 
     @JsonIgnore
+    public Member getMember() {
+        return getGame().getGuild().getMemberById(getUserID());
+    }
+
+    @JsonIgnore
     public User getUser() {
         return AsyncTI4DiscordBot.jda.getUserById(userID);
     }
@@ -1432,7 +1430,7 @@ public class Player {
         Game game = getGame();
         boolean privateGame = FoWHelper.isPrivateGame(game);
         if (privateGame && !overrideFow) {
-            return Emojis.getColorEmojiWithName(getColor());
+            return ColorEmojis.getColorEmojiWithName(getColor());
         }
 
         if (game != null && game.isCommunityMode()) {
@@ -1449,19 +1447,19 @@ public class Player {
                     }
                 }
                 if (getColor() != null && !"null".equals(getColor()) && !noColor) {
-                    sb.append(" ").append(Emojis.getColorEmojiWithName(getColor()));
+                    sb.append(" ").append(ColorEmojis.getColorEmojiWithName(getColor()));
                 }
                 return sb.toString();
             } else if (roleForCommunity != null) {
                 if (ping) {
                     return getFactionEmoji() + " " + roleForCommunity.getAsMention() + " "
-                        + Emojis.getColorEmojiWithName(getColor());
+                        + ColorEmojis.getColorEmojiWithName(getColor());
                 } else {
                     return getFactionEmoji() + " " + roleForCommunity.getName() + " "
-                        + Emojis.getColorEmojiWithName(getColor());
+                        + ColorEmojis.getColorEmojiWithName(getColor());
                 }
             } else {
-                return getFactionEmoji() + " " + Emojis.getColorEmojiWithName(getColor());
+                return getFactionEmoji() + " " + ColorEmojis.getColorEmojiWithName(getColor());
             }
         }
 
@@ -1476,7 +1474,7 @@ public class Player {
             sb.append(getUserName());
         }
         if (getColor() != null && !"null".equals(getColor()) && !noColor) {
-            sb.append(" ").append(Emojis.getColorEmojiWithName(getColor()));
+            sb.append(" ").append(ColorEmojis.getColorEmojiWithName(getColor()));
         }
         return sb.toString();
     }
@@ -1489,9 +1487,9 @@ public class Player {
 
         StringBuilder sb = new StringBuilder(userById.getAsMention());
         switch (getUserID()) {
-            case Constants.bortId -> sb.append(Emojis.BortWindow); // mysonisalsonamedbort
-            case Constants.tspId -> sb.append(Emojis.SpoonAbides); // tispoon
-            case Constants.jazzId -> sb.append(Emojis.Scout); // Jazzx
+            case Constants.bortId -> sb.append(MiscEmojis.BortWindow); // mysonisalsonamedbort
+            case Constants.tspId -> sb.append(MiscEmojis.SpoonAbides); // tispoon
+            case Constants.jazzId -> sb.append(MiscEmojis.Scout); // Jazzx
         }
         return sb.toString();
     }
@@ -1505,20 +1503,20 @@ public class Player {
         if (emoji == null && getFactionModel() != null) {
             emoji = getFactionModel().getFactionEmoji();
         }
-        return emoji != null ? emoji : Emojis.getFactionIconFromDiscord(faction);
+        return emoji != null ? emoji : FactionEmojis.getFactionIcon(faction).toString();
     }
 
     @JsonIgnore
     public String fogSafeEmoji() {
         if (getGame() != null && getGame().isFowMode())
-            return Emojis.getColorEmoji(getColor());
+            return ColorEmojis.getColorEmoji(getColor()).toString();
         return getFactionEmoji();
     }
 
     @JsonIgnore
     public String getFactionEmojiOrColor() {
         if (getGame().isFowMode() || FoWHelper.isPrivateGame(getGame())) {
-            return Emojis.getColorEmojiWithName(getColor());
+            return ColorEmojis.getColorEmojiWithName(getColor());
         }
         return getFactionEmoji();
     }
@@ -1606,19 +1604,7 @@ public class Player {
     }
 
     public boolean isAFK() {
-        String afkHours = UserSettingsManager.get(userID).getAfkHours();
-        if (isBlank(afkHours)) {
-            return false;
-        }
-        String[] hoursAFK = afkHours.split(";");
-        int currentHour = Helper.getCurrentHour();
-        for (String hour : hoursAFK) {
-            int h = Integer.parseInt(hour);
-            if (h == currentHour) {
-                return true;
-            }
-        }
-        return false;
+        return AFKService.userIsAFK(getUserID());
     }
 
     public boolean hasUnexhaustedLeader(String leaderId) {
@@ -1938,8 +1924,7 @@ public class Player {
 
         followedSCs.add(sc);
         if (game != null && game.getActivePlayer() != null) {
-            if (game.getStoredValue("endTurnWhenSCFinished")
-                .equalsIgnoreCase(sc + game.getActivePlayer().getFaction())) {
+            if (game.getStoredValue("endTurnWhenSCFinished").equalsIgnoreCase(sc + game.getActivePlayer().getFaction())) {
                 for (Player p2 : game.getRealPlayers()) {
                     if (!p2.hasFollowedSC(sc)) {
                         return;
@@ -2068,7 +2053,7 @@ public class Player {
 
     public List<String> getTeamMateIDs() {
         if (!teamMateIDs.contains(getUserID())) {
-            teamMateIDs.add(getUserID());
+            teamMateIDs.add(getUserID()); // a few things depend on the "primary" user being here
         }
         return teamMateIDs;
     }
@@ -2262,12 +2247,12 @@ public class Player {
         return factionTechs.remove(techID);
     }
 
-    public void addTeamMateID(String techID) {
-        teamMateIDs.add(techID);
+    public void addTeamMateID(String userID) {
+        teamMateIDs.add(userID);
     }
 
-    public void removeTeamMateID(String techID) {
-        teamMateIDs.remove(techID);
+    public void removeTeamMateID(String userID) {
+        teamMateIDs.remove(userID);
     }
 
     public void addTech(String techID) {
@@ -2449,7 +2434,6 @@ public class Player {
 
     public void setAutoSaboPassMedian(int median) {
         autoSaboPassMedian = median;
-        // setGlobalUserSetting("autoSaboPassMedianHours", String.valueOf(median));
     }
 
     public void setStasisInfantry(int stasisInfantry) {
@@ -2902,9 +2886,8 @@ public class Player {
     public MessageChannel getCorrectChannel() {
         if (getGame().isFowMode()) {
             return getPrivateChannel();
-        } else {
-            return getGame().getMainGameChannel();
         }
+        return getGame().getMainGameChannel();
     }
 
     public String bannerName() {
@@ -2946,8 +2929,8 @@ public class Player {
         // }
 
         // DESCRIPTION
-        String desc = Emojis.getColorEmojiWithName(getColor()) +
-            "\n" + StringUtils.repeat(Emojis.comm, getCommoditiesTotal());
+        String desc = ColorEmojis.getColorEmojiWithName(getColor()) +
+            "\n" + MiscEmojis.comm(getCommoditiesTotal());
         eb.setDescription(desc);
 
         // FIELDS

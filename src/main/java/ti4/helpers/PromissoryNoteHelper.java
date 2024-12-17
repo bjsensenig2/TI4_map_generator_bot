@@ -20,6 +20,10 @@ import ti4.message.MessageHelper;
 import ti4.model.PromissoryNoteModel;
 import ti4.model.Source;
 import ti4.model.TemporaryCombatModifierModel;
+import ti4.service.emoji.CardEmojis;
+import ti4.service.emoji.ColorEmojis;
+import ti4.service.emoji.FactionEmojis;
+import ti4.service.emoji.SourceEmojis;
 import ti4.service.game.StartPhaseService;
 import ti4.service.leader.CommanderUnlockCheckService;
 import ti4.service.unit.AddUnitService;
@@ -29,9 +33,9 @@ public class PromissoryNoteHelper {
 
     public static void sendPromissoryNoteInfo(Game game, Player player, boolean longFormat) {
         MessageHelper.sendMessageToChannelWithButtons(
-                player.getCardsInfoThread(),
-                getPromissoryNoteCardInfo(game, player, longFormat, false),
-                getPNButtons(game, player));
+            player.getCardsInfoThread(),
+            getPromissoryNoteCardInfo(game, player, longFormat, false),
+            getPNButtons(game, player));
     }
 
     public static void sendPromissoryNoteInfo(Game game, Player player, boolean longFormat, GenericInteractionCreateEvent event) {
@@ -86,14 +90,10 @@ public class PromissoryNoteHelper {
     }
 
     public static String getPromissoryNoteRepresentation(Game game, String pnID) {
-        return getPromissoryNoteRepresentation(game, pnID, null, true);
+        return getPromissoryNoteRepresentation(game, pnID, true);
     }
 
     public static String getPromissoryNoteRepresentation(Game game, String pnID, boolean longFormat) {
-        return getPromissoryNoteRepresentation(game, pnID, null, longFormat);
-    }
-
-    public static String getPromissoryNoteRepresentation(Game game, String pnID, Integer pnUniqueID, boolean longFormat) {
         PromissoryNoteModel pnModel = Mapper.getPromissoryNotes().get(pnID);
         if (pnModel == null) {
             String error = "Could not find representation for PN ID: " + pnID;
@@ -103,8 +103,8 @@ public class PromissoryNoteHelper {
         String pnName = pnModel.getName();
         StringBuilder sb = new StringBuilder();
 
-        sb.append(Emojis.PN);
-        if (pnModel.getFaction().isPresent()) sb.append(Emojis.getFactionIconFromDiscord(pnModel.getFaction().get()));
+        sb.append(CardEmojis.PN);
+        if (pnModel.getFaction().isPresent()) sb.append(FactionEmojis.getFactionIcon(pnModel.getFaction().get()));
         sb.append("__**").append(pnName).append("**__");
         sb.append(pnModel.getSource().emoji());
         sb.append("   ");
@@ -113,13 +113,13 @@ public class PromissoryNoteHelper {
         Player pnOwner = game.getPNOwner(pnID);
         if (pnOwner != null && pnOwner.isRealPlayer()) {
             if (!game.isFowMode()) sb.append(pnOwner.getFactionEmoji());
-            sb.append(Emojis.getColorEmojiWithName(pnOwner.getColor()));
-            pnText = pnText.replaceAll(pnOwner.getColor(), Emojis.getColorEmojiWithName(pnOwner.getColor()));
+            sb.append(ColorEmojis.getColorEmojiWithName(pnOwner.getColor()));
+            pnText = pnText.replaceAll(pnOwner.getColor(), ColorEmojis.getColorEmojiWithName(pnOwner.getColor()));
         }
 
         if (longFormat ||
-                Mapper.isValidFaction(pnModel.getFaction().orElse("").toLowerCase()) ||
-                (pnModel.getSource() != Source.ComponentSource.base && pnModel.getSource() != Source.ComponentSource.pok)) {
+            Mapper.isValidFaction(pnModel.getFaction().orElse("").toLowerCase()) ||
+            (pnModel.getSource() != Source.ComponentSource.base && pnModel.getSource() != Source.ComponentSource.pok)) {
             sb.append("      ").append(pnText);
         }
         sb.append("\n");
@@ -168,7 +168,7 @@ public class PromissoryNoteHelper {
             Button transact;
             if (game.isFowMode()) {
                 transact = Buttons.green("resolvePNPlay_" + pnShortHand,
-                        "Play " + owner.getColor() + " " + promissoryNote.getName());
+                    "Play " + owner.getColor() + " " + promissoryNote.getName());
             } else {
                 transact = Buttons.green("resolvePNPlay_" + pnShortHand, "Play " + promissoryNote.getName()).withEmoji(Emoji.fromFormatted(owner.getFactionEmoji()));
             }
@@ -209,12 +209,12 @@ public class PromissoryNoteHelper {
 
         String emojiToUse = game.isFowMode() ? "" : owner.getFactionEmoji();
         StringBuilder sb = new StringBuilder(player.getRepresentation() + " played promissory note: " + pnName + "\n");
-        sb.append(emojiToUse).append(Emojis.PN);
+        sb.append(emojiToUse).append(CardEmojis.PN);
         String pnText;
 
         // Handle AbsolMode Political Secret
         if (game.isAbsolMode() && id.endsWith("_ps")) {
-            pnText = "Political Secret" + Emojis.Absol
+            pnText = "Political Secret" + SourceEmojis.Absol
                 + ":  *When you cast votes:* You may exhaust up to 3 of the {color} player's planets and cast additional votes equal to the combined influence value of the exhausted planets. Then return this card to the {color} player.";
         } else {
             pnText = Mapper.getPromissoryNote(id).getName();
@@ -240,6 +240,9 @@ public class PromissoryNoteHelper {
         }
         if ("terraform".equalsIgnoreCase(id)) {
             ButtonHelperFactionSpecific.offerTerraformButtons(player, game, event);
+        }
+        if ("sigma_cyber".equalsIgnoreCase(id)) {
+            ButtonHelperFactionSpecific.resolveSigmaLizixPN(player, game, event);
         }
         if ("dspnrohd".equalsIgnoreCase(id)) {
             ButtonHelperFactionSpecific.offerAutomatonsButtons(player, game, event);
@@ -276,7 +279,13 @@ public class PromissoryNoteHelper {
         }
         if ("ragh".equalsIgnoreCase(id)) {
             String message = player.getRepresentationUnfogged() + " select planet to Ragh's Call on";
-            MessageHelper.sendMessageToChannel(player.getCorrectChannel(), message,
+            MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(), message,
+                ButtonHelperFactionSpecific.getRaghsCallButtons(player, game,
+                    game.getTileByPosition(game.getActiveSystem())));
+        }
+        if ("sigma_raghs_call".equalsIgnoreCase(id)) {
+            String message = player.getRepresentationUnfogged() + " select planet to Ragh's Call on. You will need to ready the planet manually if applicable.";
+            MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(), message,
                 ButtonHelperFactionSpecific.getRaghsCallButtons(player, game,
                     game.getTileByPosition(game.getActiveSystem())));
         }
@@ -287,6 +296,11 @@ public class PromissoryNoteHelper {
             game.drawSecretObjective(player.getUserID());
             MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
                 player.getRepresentation() + " drew an extra SO due to Tnelis PN. Please discard an extra SO");
+        }
+        if ("sigma_sycophancy".equalsIgnoreCase(id)) {
+            game.drawSecretObjective(player.getUserID());
+            MessageHelper.sendMessageToChannel(player.getCorrectChannel(),
+                player.getRepresentation() + " drew an extra SO due to _Sycophancy_. Please discard an extra SO.");
         }
         if ("dspnvade".equalsIgnoreCase(id)) {
             ButtonHelperFactionSpecific.resolveVadenTgForSpeed(player, event);
@@ -313,6 +327,17 @@ public class PromissoryNoteHelper {
                 game.getStoredValue("AssassinatedReps") + owner.getFaction());
         }
         if ("fires".equalsIgnoreCase(id)) {
+            player.addTech("ws");
+            CommanderUnlockCheckService.checkPlayer(player, "mirveda");
+            MessageHelper.sendMessageToChannel(event.getMessageChannel(), player.getRepresentationUnfogged() + " acquired War Sun tech");
+            String reducedMsg = owner.getRepresentationUnfogged() + ", you must spend 1 command token due to _Fires of the Gashlai_ being played.";
+            if (game.isFowMode()) {
+                MessageHelper.sendMessageToChannelWithButtons(owner.getPrivateChannel(), reducedMsg, ButtonHelper.getLoseCCButtons(owner));
+            } else {
+                MessageHelper.sendMessageToChannelWithButtons(game.getMainGameChannel(), reducedMsg, ButtonHelper.getLoseCCButtons(owner));
+            }
+        }
+        if ("sigma_fires".equalsIgnoreCase(id)) {
             player.addTech("ws");
             CommanderUnlockCheckService.checkPlayer(player, "mirveda");
             MessageHelper.sendMessageToChannel(event.getMessageChannel(), player.getRepresentationUnfogged() + " acquired War Sun tech");
@@ -454,6 +479,11 @@ public class PromissoryNoteHelper {
                 MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(), message,
                     purgeFragButtons);
             }
+        }
+        if ("sigma_excavation_experts".equalsIgnoreCase(id)) {
+            List<Button> exploreButtons = ButtonHelper.getButtonsToExploreAllPlanets(player, game);
+            MessageHelper.sendMessageToChannelWithButtons(player.getCorrectChannel(),
+                    player.getRepresentation() + ", explore each planet that contains your mechs.", exploreButtons);
         }
         if (pn.getText().toLowerCase().contains("action:") && !"acq".equalsIgnoreCase(id)) {
             ComponentActionHelper.serveNextComponentActionButtons(event, game, player);

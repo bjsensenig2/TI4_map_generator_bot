@@ -6,9 +6,13 @@ import java.util.List;
 import lombok.experimental.UtilityClass;
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import ti4.helpers.AliasHandler;
+import ti4.helpers.ButtonHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.Units;
+import ti4.image.Mapper;
 import ti4.map.Game;
+import ti4.map.Player;
 import ti4.map.Tile;
 import ti4.map.UnitHolder;
 import ti4.message.BotLogger;
@@ -58,10 +62,15 @@ public class RemoveUnitService {
         if (toRemoveCount > 0) {
             MessageHelper.replyToMessage(event, "Did not find enough units to remove, " + toRemoveCount + " missing.");
         }
+        Player player = game.getPlayerFromColorOrFaction(parsedUnit.getUnitKey().getColor());
+        if (player != null) {
+            if (player.hasAbility("necrophage") && player.getCommoditiesTotal() < 5 && !player.getFaction().contains("franken")) {
+                player.setCommoditiesTotal(1 + ButtonHelper.getNumberOfUnitsOnTheBoard(game,
+                    Mapper.getUnitKey(AliasHandler.resolveUnit("spacedock"), player.getColor())));
+            }
+        }
 
-        tile.getUnitHolders().values().forEach(unitHolder ->
-            AddPlanetToPlayAreaService.addPlanetToPlayArea(event, tile, unitHolder.getName(), game)
-        );
+        tile.getUnitHolders().values().forEach(unitHolder -> AddPlanetToPlayAreaService.addPlanetToPlayArea(event, tile, unitHolder.getName(), game));
     }
 
     private static int getNumberOfDamagedUnitsToRemove(UnitHolder unitHolder, Units.UnitKey unitKey, boolean prioritizeDamagedUnits, int oldUnitCount, int unitsRemoved) {
@@ -91,7 +100,7 @@ public class RemoveUnitService {
     }
 
     private static void handleEmptyUnitHolders(GenericInteractionCreateEvent event, Tile tile, ParsedUnit parsedUnit) {
-        if (event instanceof ButtonInteractionEvent) {
+        if (event != null && event instanceof ButtonInteractionEvent) {
             BotLogger.log(event.getId() + " found a null UnitHolder with the following info: " + tile.getRepresentation() + " " + parsedUnit.getLocation());
         } else {
             MessageHelper.replyToMessage(event, "Unable to determine where the units are being removed from.");

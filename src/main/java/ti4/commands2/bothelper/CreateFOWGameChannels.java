@@ -20,9 +20,8 @@ import ti4.commands2.Subcommand;
 import ti4.helpers.Constants;
 import ti4.helpers.Helper;
 import ti4.map.Game;
-import ti4.map.GameManager;
-import ti4.map.GameSaveLoadManager;
 import ti4.map.Player;
+import ti4.map.manage.GameManager;
 import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
 import ti4.service.game.CreateGameService;
@@ -97,21 +96,21 @@ class CreateFOWGameChannels extends Subcommand {
         Role role = guild.createRole()
             .setName(gameName)
             .setMentionable(true)
-            .complete();
+            .complete();// Must `complete` if we're using this channel as part of an interaction that saves the game
 
         Role roleGM = guild.createRole()
             .setName(gameName + " GM")
             .setMentionable(true)
-            .complete();
+            .complete();// Must `complete` if we're using this channel as part of an interaction that saves the game
 
-        guild.addRoleToMember(gameOwner, roleGM).complete();
+        guild.addRoleToMember(gameOwner, roleGM).queue();
         //ADD PLAYERS TO ROLE
         for (Member member : members) {
-            guild.addRoleToMember(member, role).complete();
+            guild.addRoleToMember(member, role).queue();
         }
 
         // CREATE GAME
-        Game newGame = CreateGameService.createNewGame(event, gameName, gameOwner);
+        Game newGame = CreateGameService.createNewGame(gameName, gameOwner);
         newGame.setFowMode(true);
 
         //ADD PLAYERS
@@ -123,7 +122,11 @@ class CreateFOWGameChannels extends Subcommand {
         // CREATE CATEGORY
         Role everyone = guild.getRolesByName("@everyone", true).getFirst();
         long permission2 = Permission.MESSAGE_MANAGE.getRawValue() | Permission.VIEW_CHANNEL.getRawValue() | Permission.MANAGE_PERMISSIONS.getRawValue() | Permission.MANAGE_THREADS.getRawValue();
-        Category category = guild.createCategory(gameName).addRolePermissionOverride(everyone.getIdLong(), 0, permission2).addRolePermissionOverride(roleGM.getIdLong(), permission2, 0).complete();
+        Category category = guild
+            .createCategory(gameName)
+            .addRolePermissionOverride(everyone.getIdLong(), 0, permission2)
+            .addRolePermissionOverride(roleGM.getIdLong(), permission2, 0)
+            .complete();// Must `complete` if we're using this channel as part of an interaction that saves the game
 
         //CREATE CHANNELS
         String newGMChannelName = gameName + "-gm-room";
@@ -136,7 +139,7 @@ class CreateFOWGameChannels extends Subcommand {
         TextChannel gmChannel = guild.createTextChannel(newGMChannelName, category)
             .syncPermissionOverrides()
             .addRolePermissionOverride(gameRoleGMID, permission, 0)
-            .complete();
+            .complete();// Must `complete` if we're using this channel as part of an interaction that saves the game
         MessageHelper.sendMessageToChannel(gmChannel, roleGM.getAsMention() + " - gm room");
         CreateGameService.offerGameHomebrewButtons(gmChannel);
 
@@ -144,7 +147,7 @@ class CreateFOWGameChannels extends Subcommand {
         TextChannel actionsChannel = guild.createTextChannel(newActionsChannelName, category)
             .syncPermissionOverrides()
             .addRolePermissionOverride(gameRoleID, permission, 0)
-            .complete();
+            .complete();// Must `complete` if we're using this channel as part of an interaction that saves the game
         MessageHelper.sendMessageToChannel(actionsChannel, role.getAsMention() + " - actions channel");
         newGame.setMainChannelID(actionsChannel.getId());
 
@@ -157,7 +160,7 @@ class CreateFOWGameChannels extends Subcommand {
             TextChannel memberChannel = guild.createTextChannel(gameName + "-" + name + "-private", category)
                 .syncPermissionOverrides()
                 .addMemberPermissionOverride(member.getIdLong(), permission, 0)
-                .complete();
+                .complete();// Must `complete` if we're using this channel as part of an interaction that saves the game
             Player player_ = newGame.getPlayer(member.getId());
             player_.setPrivateChannelID(memberChannel.getId());
         }
@@ -167,7 +170,7 @@ class CreateFOWGameChannels extends Subcommand {
             "> " + actionsChannel.getAsMention() + "\n";
         MessageHelper.sendMessageToEventChannel(event, message);
 
-        GameSaveLoadManager.saveGame(newGame, event);
+        GameManager.save(newGame, "Create FOW Game Channels");
     }
 
     private static String getNextFOWGameName() {

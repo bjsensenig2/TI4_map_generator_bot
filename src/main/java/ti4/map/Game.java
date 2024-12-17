@@ -2,9 +2,6 @@ package ti4.map;
 
 import java.awt.*;
 import java.lang.reflect.Field;
-import java.time.LocalDate;
-import java.time.Period;
-import java.time.ZoneId;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,7 +53,6 @@ import ti4.helpers.ButtonHelperAgents;
 import ti4.helpers.ColorChangeHelper;
 import ti4.helpers.Constants;
 import ti4.helpers.DisplayType;
-import ti4.helpers.Emojis;
 import ti4.helpers.FoWHelper;
 import ti4.helpers.Helper;
 import ti4.helpers.SecretObjectiveHelper;
@@ -83,6 +79,10 @@ import ti4.model.StrategyCardModel;
 import ti4.model.StrategyCardSetModel;
 import ti4.model.TechnologyModel;
 import ti4.model.UnitModel;
+import ti4.model.metadata.AutoPingMetadataManager;
+import ti4.service.emoji.MiscEmojis;
+import ti4.service.emoji.SourceEmojis;
+import ti4.service.fow.FowConstants;
 import ti4.service.leader.CommanderUnlockCheckService;
 import ti4.service.milty.MiltyDraftManager;
 
@@ -115,9 +115,7 @@ public class Game extends GameProperties {
     @Getter
     private DisplayType displayTypeForced;
     private @Getter @Setter List<BorderAnomalyHolder> borderAnomalies = new ArrayList<>();
-    private Date lastActivePlayerPing = new Date(0);
     private Date lastActivePlayerChange = new Date(0);
-    private Date lastTimeGamesChecked = new Date(0);
     @JsonProperty("autoPingStatus")
     private boolean autoPingEnabled;
 
@@ -167,6 +165,9 @@ public class Game extends GameProperties {
     @Setter
     private Map<String, Integer> tileDistances = new HashMap<>();
     private MiltyDraftManager miltyDraftManager;
+    @Setter
+    @Getter
+    private String miltyDraftString;
     @Setter
     private MiltySettings miltySettings;
     @Getter
@@ -305,11 +306,23 @@ public class Game extends GameProperties {
         return returnValue;
     }
 
+    @JsonIgnore
+    public MiltyDraftManager getMiltyDraftManagerUnsafe() {
+        return miltyDraftManager;
+    }
+
     @NotNull
     @JsonIgnore
     public MiltyDraftManager getMiltyDraftManager() {
         if (miltyDraftManager == null) {
             miltyDraftManager = new MiltyDraftManager();
+            if (StringUtils.isNotBlank(miltyDraftString)) {
+                try {
+                    miltyDraftManager.loadSuperSaveString(miltyDraftString);
+                } catch (Exception e) {
+                    miltyDraftManager = new MiltyDraftManager();
+                }
+            }
         }
         return miltyDraftManager;
     }
@@ -318,8 +331,8 @@ public class Game extends GameProperties {
         this.miltyDraftManager = miltyDraftManager;
     }
 
-    @JsonProperty("miltySettings")
     @Nullable
+    @JsonProperty("miltySettings")
     public MiltySettings getMiltySettingsUnsafe() {
         return miltySettings;
     }
@@ -331,8 +344,9 @@ public class Game extends GameProperties {
                     JsonNode json = ObjectMapperFactory.build().readTree(miltyJson);
                     miltySettings = new MiltySettings(this, json);
                 } catch (Exception e) {
-                    BotLogger.log("Failed loading milty draft settings for `" + getName() + "` " + Constants.jazzPing());
-                    MessageHelper.sendMessageToChannel(getActionsChannel(), "Milty draft settings failed to load. ");
+                    BotLogger.log("Failed loading milty draft settings for `" + getName() + "` " + Constants.jazzPing(), e);
+                    MessageHelper.sendMessageToChannel(getActionsChannel(), "Milty draft settings failed to load. Resetting to default.");
+                    miltySettings = new MiltySettings(this, null);
                 }
             } else {
                 miltySettings = new MiltySettings(this, null);
@@ -463,6 +477,10 @@ public class Game extends GameProperties {
         return super.getActiveSystem();
     }
 
+    public String getCurrentActiveSystem() {
+        return super.getActiveSystem();
+    }
+
     public Map<String, String> getFowOptions() {
         return fowOptions;
     }
@@ -475,24 +493,28 @@ public class Game extends GameProperties {
         fowOptions.put(optionName, value);
     }
 
+    public boolean hideUserNames() {
+        return Boolean.parseBoolean(getFowOption(FowConstants.HIDE_NAMES));
+    }
+
     @JsonIgnore
     public String getGameModesText() {
         boolean isNormalGame = isNormalGame();
         Map<String, Boolean> gameModes = new HashMap<>() {
             {
-                put(Emojis.TI4PoK + "Normal", isNormalGame);
-                put(Emojis.TI4BaseGame + "Base Game", isBaseGameMode());
-                put(Emojis.MiltyMod + "MiltyMod", isMiltyModMode());
-                put(Emojis.TIGL + "TIGL", isCompetitiveTIGLGame());
+                put(SourceEmojis.TI4PoK + "Normal", isNormalGame);
+                put(SourceEmojis.TI4BaseGame + "Base Game", isBaseGameMode());
+                put(SourceEmojis.MiltyMod + "MiltyMod", isMiltyModMode());
+                put(MiscEmojis.TIGL + "TIGL", isCompetitiveTIGLGame());
                 put("Community", isCommunityMode());
                 put("Minor Factions", isMinorFactionsMode());
                 put("Age of Exploration", isAgeOfExplorationMode());
                 put("Alliance", isAllianceMode());
                 put("FoW", isFowMode());
                 put("Franken", isFrankenGame());
-                put(Emojis.Absol + "Absol", isAbsolMode());
+                put(SourceEmojis.Absol + "Absol", isAbsolMode());
                 put("VotC", isVotcMode());
-                put(Emojis.DiscordantStars + "DiscordantStars", isDiscordantStarsMode());
+                put(SourceEmojis.DiscordantStars + "DiscordantStars", isDiscordantStarsMode());
                 put("HomebrewSC", isHomebrewSCMode());
                 put("Little Omega", isLittleOmega());
                 put("AC Deck 2", "action_deck_2".equals(getAcDeckID()));
@@ -762,8 +784,7 @@ public class Game extends GameProperties {
         if (getTileMap().isEmpty()) {
             return 0;
         }
-        Map<String, Tile> tileMap = new HashMap<>(getTileMap());
-        String highestPosition = tileMap.keySet().stream()
+        String highestPosition = getTileMap().keySet().stream()
             .filter(Helper::isInteger)
             .max(Comparator.comparingInt(Integer::parseInt))
             .orElse(null);
@@ -936,19 +957,7 @@ public class Game extends GameProperties {
         // reset timers for ping and stats
         setActivePlayerID(player == null ? null : player.getUserID());
         setLastActivePlayerChange(newTime);
-        setLastActivePlayerPing(newTime);
-    }
-
-    public Date getLastActivePlayerPing() {
-        return lastActivePlayerPing;
-    }
-
-    public Date getLastTimeGamesChecked() {
-        return lastTimeGamesChecked;
-    }
-
-    public void setLastTimeGamesChecked(Date time) {
-        lastTimeGamesChecked = time;
+        AutoPingMetadataManager.setupAutoPing(getName());
     }
 
     public void setAutoPing(boolean status) {
@@ -957,10 +966,6 @@ public class Game extends GameProperties {
 
     public boolean getAutoPingStatus() {
         return autoPingEnabled;
-    }
-
-    public void setLastActivePlayerPing(Date time) {
-        lastActivePlayerPing = time;
     }
 
     public Date getLastActivePlayerChange() {
@@ -1047,7 +1052,7 @@ public class Game extends GameProperties {
             if (player != null) {
                 player.setTg(player.getTg() + tradeGoodCount);
                 ButtonHelperAbilities.pillageCheck(player, this);
-                ButtonHelperAgents.resolveArtunoCheck(player, this, tradeGoodCount);
+                ButtonHelperAgents.resolveArtunoCheck(player, tradeGoodCount);
                 tradeGoodCount = 0;
                 MessageHelper.sendMessageToChannel(getActionsChannel(), "The " + tradeGoodCount + "TGs"
                     + " that would be placed on the SC " + sc + " have instead been given to the Kyro Hero player, as per Kyro Hero text");
@@ -2213,12 +2218,6 @@ public class Game extends GameProperties {
         return succeeded;
     }
 
-    public boolean putSpecificAgendaOnTop(String agendaID) {
-        boolean succeeded = getAgendas().remove(agendaID);
-        addDiscardAgenda(agendaID);
-        return succeeded;
-    }
-
     public String getNextAgenda(boolean revealFromBottom) {
         int index = revealFromBottom ? getAgendas().size() - 1 : 0;
         return getAgendas().get(index);
@@ -3073,16 +3072,6 @@ public class Game extends GameProperties {
         this.discardActionCards = discardActionCards;
     }
 
-    public String getGameNameForSorting() {
-        if (getName().startsWith("pbd")) {
-            return StringUtils.leftPad(getName(), 10, "0");
-        }
-        if (getName().startsWith("fow")) {
-            return StringUtils.leftPad(getName(), 10, "1");
-        }
-        return getName();
-    }
-
     @JsonIgnore
     public String getPing() {
         Role role = getGameRole();
@@ -3249,8 +3238,7 @@ public class Game extends GameProperties {
     }
 
     public Player getPlayer(String userID) {
-        if (userID == null)
-            return null;
+        if (userID == null) return null;
         return players.get(userID);
     }
 
@@ -3350,23 +3338,6 @@ public class Game extends GameProperties {
             }
         }
         return planets.keySet();
-    }
-
-    public void endGameIfOld() {
-        if (isHasEnded())
-            return;
-
-        LocalDate currentDate = LocalDate.now();
-        LocalDate lastModifiedDate = (new Date(getLastModifiedDate())).toInstant().atZone(ZoneId.systemDefault())
-            .toLocalDate();
-        Period period = Period.ofMonths(2); // TODO: CANDIDATE FOR GLOBAL VARIABLE
-        LocalDate oldestLastModifiedDateBeforeEnding = currentDate.minus(period);
-
-        if (lastModifiedDate.isBefore(oldestLastModifiedDateBeforeEnding)) {
-            BotLogger.log("Game: " + getName() + " has not been modified since ~" + lastModifiedDate + " - the game flag `hasEnded` has been set to true");
-            setHasEnded(true);
-            GameSaveLoadManager.saveGame(this, "Game ended");
-        }
     }
 
     public void rebuildTilePositionAutoCompleteList() {
@@ -4221,5 +4192,14 @@ public class Game extends GameProperties {
             }
         }
         return false;
+    }
+
+    public List<String> getAllTeamMateIDs() {
+        List<String> teamMateIDs = new ArrayList<>();
+        for (Player player : getPlayers().values()) {
+            teamMateIDs.addAll(player.getTeamMateIDs());
+            teamMateIDs.remove(player.getUserID());
+        }
+        return teamMateIDs;
     }
 }

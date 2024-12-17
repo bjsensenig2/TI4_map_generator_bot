@@ -10,13 +10,13 @@ import org.apache.commons.lang3.StringUtils;
 import ti4.commands2.GameStateSubcommand;
 import ti4.helpers.AliasHandler;
 import ti4.helpers.Constants;
-import ti4.helpers.Emojis;
 import ti4.image.Mapper;
 import ti4.image.TileHelper;
 import ti4.map.Game;
 import ti4.map.Player;
 import ti4.map.Tile;
 import ti4.message.MessageHelper;
+import ti4.service.emoji.MiscEmojis;
 import ti4.service.leader.CommanderUnlockCheckService;
 
 class MoveCreussWormhole extends GameStateSubcommand {
@@ -43,13 +43,16 @@ class MoveCreussWormhole extends GameStateSubcommand {
         String tokenName = event.getOption(Constants.CREUSS_TOKEN_NAME, null, OptionMapping::getAsString);
         tokenName = AliasHandler.resolveToken(tokenName);
         if (!isValidCreussWormhole(tokenName)) {
+            tokenName = "creuss" + tokenName;
+        }
+        if (!isValidCreussWormhole(tokenName)) {
             MessageHelper.sendMessageToEventChannel(event, "Token Name: " + tokenName + " is not a valid Creuss Wormhole Token.");
             return;
         }
 
         StringBuilder sb = new StringBuilder(player.getRepresentation());
         tile.addToken(Mapper.getTokenID(tokenName), Constants.SPACE);
-        sb.append(" moved ").append(Emojis.getEmojiFromDiscord(tokenName)).append(" to ").append(tile.getRepresentation());
+        sb.append(" moved ").append(MiscEmojis.getCreussWormhole(tokenName)).append(" to ").append(tile.getRepresentation());
         for (Tile tile_ : game.getTileMap().values()) {
             if (!tile.equals(tile_) && tile_.removeToken(Mapper.getTokenID(tokenName), Constants.SPACE)) {
                 sb.append(" (from ").append(tile_.getRepresentation()).append(")");

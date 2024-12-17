@@ -145,12 +145,13 @@ public abstract class BagDraft {
         if (owner.getName().contains("pbd100") || owner.getName().contains("pbd500")) {
             isPrivateChannel = true;
         }
-        ThreadChannelAction threadAction = actionsChannel.createThreadChannel(threadName, isPrivateChannel);
-        threadAction.setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_24_HOURS);
+        ThreadChannelAction threadAction = actionsChannel
+            .createThreadChannel(threadName, isPrivateChannel)
+            .setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_24_HOURS);
         if (isPrivateChannel) {
-            threadAction.setInvitable(false);
+            threadAction = threadAction.setInvitable(false);
         }
-        ThreadChannel threadChannel = threadAction.complete();
+        ThreadChannel threadChannel = threadAction.complete(); // Must `complete` if we're using this channel as part of an interaction that saves the game
         player.setBagInfoThreadID(threadChannel.getId());
         return threadChannel;
     }
@@ -183,6 +184,7 @@ public abstract class BagDraft {
                 }
 
                 // SEARCH FOR EXISTING CLOSED/ARCHIVED THREAD
+                // Must `complete` if we're using this channel as part of an interaction that saves the game
                 List<ThreadChannel> hiddenThreadChannels = actionsChannel.retrieveArchivedPrivateThreadChannels().complete();
                 for (ThreadChannel threadChannel_ : hiddenThreadChannels) {
                     if (threadChannel_.getId().equals(bagInfoThread)) {
@@ -212,6 +214,7 @@ public abstract class BagDraft {
                 }
 
                 // SEARCH FOR EXISTING CLOSED/ARCHIVED THREAD
+                // Must `complete` if we're using this channel as part of an interaction that saves the game
                 List<ThreadChannel> hiddenThreadChannels = actionsChannel.retrieveArchivedPrivateThreadChannels().complete();
                 for (ThreadChannel threadChannel_ : hiddenThreadChannels) {
                     if (threadChannel_.getName().equals(threadName)) {

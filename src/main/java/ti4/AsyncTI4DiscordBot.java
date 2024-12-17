@@ -7,8 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import net.dv8tion.jda.api.JDA;
@@ -27,16 +25,22 @@ import org.reflections.scanners.SubTypesScanner;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 import ti4.commands2.CommandManager;
+import ti4.cron.AgendaPhaseAutoReactCron;
 import ti4.cron.AutoPingCron;
 import ti4.cron.CronManager;
+import ti4.cron.EndOldGamesCron;
+import ti4.cron.FastScFollowCron;
+import ti4.cron.LogButtonRuntimeStatisticsCron;
 import ti4.cron.LogCacheStatsCron;
 import ti4.cron.OldUndoFileCleanupCron;
+import ti4.cron.ReuploadStaleEmojisCron;
+import ti4.cron.SabotageAutoReactCron;
+import ti4.cron.TechSummaryCron;
 import ti4.cron.UploadStatsCron;
+import ti4.executors.ExecutorManager;
 import ti4.helpers.AliasHandler;
-import ti4.helpers.FoWHelper;
 import ti4.helpers.Storage;
 import ti4.helpers.TIGLHelper;
-import ti4.helpers.TimedRunnable;
 import ti4.image.MapRenderPipeline;
 import ti4.image.Mapper;
 import ti4.image.PositionMapper;
@@ -49,11 +53,12 @@ import ti4.listeners.ModalListener;
 import ti4.listeners.SelectionMenuListener;
 import ti4.listeners.SlashCommandListener;
 import ti4.listeners.UserJoinServerListener;
-import ti4.map.GameSaveLoadManager;
+import ti4.map.manage.GameManager;
 import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
-import ti4.processors.ButtonProcessor;
+import ti4.migration.DataMigrationManager;
 import ti4.selections.SelectionManager;
+import ti4.service.emoji.ApplicationEmojiService;
 import ti4.service.statistics.StatisticsPipeline;
 import ti4.settings.GlobalSettings;
 import ti4.settings.GlobalSettings.ImplementedSettings;
@@ -66,7 +71,6 @@ public class AsyncTI4DiscordBot {
     public static final List<Role> adminRoles = new ArrayList<>();
     public static final List<Role> developerRoles = new ArrayList<>();
     public static final List<Role> bothelperRoles = new ArrayList<>();
-    private static final ExecutorService THREAD_POOL = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors()));
 
     public static JDA jda;
     public static String userID;
@@ -143,9 +147,6 @@ public class AsyncTI4DiscordBot {
         if (args.length >= 5) {
             guildFogOfWar = jda.getGuildById(args[4]);
             startBot(guildFogOfWar);
-
-            // JAZZ WILL GET PINGED IF SHIT IS BROKEN FOR FOG GAMES
-            FoWHelper.sanityCheckFowReacts();
         }
 
         // Async: Stroter's Paradise
@@ -193,6 +194,7 @@ public class AsyncTI4DiscordBot {
         // LOAD DATA
         BotLogger.logWithTimestamp(" LOADING DATA");
         jda.getPresence().setActivity(Activity.customStatus("STARTING UP: Loading Data"));
+        ApplicationEmojiService.uploadNewEmojis();
         TileHelper.init();
         PositionMapper.init();
         Mapper.init();
@@ -206,25 +208,30 @@ public class AsyncTI4DiscordBot {
 
         // LOAD GAMES NAMES
         BotLogger.logWithTimestamp(" LOADING GAMES");
-        GameSaveLoadManager.loadGame();
-        BotLogger.logWithTimestamp(" FINISHED LOADING GAMES");
+        GameManager.initialize();
 
         // RUN DATA MIGRATIONS
-        BotLogger.logWithTimestamp(" CHECKING FOR DATA MIGRATIONS");
-        DataMigrationManager.runMigrations();
-        BotLogger.logWithTimestamp(" FINISHED CHECKING FOR DATA MIGRATIONS");
+        if (DataMigrationManager.runMigrations()) {
+            BotLogger.logWithTimestamp(" RAN MIGRATIONS");
+        }
 
         // START ASYNC PIPELINES
         ImageIO.setUseCache(false);
         MapRenderPipeline.start();
         StatisticsPipeline.start();
-        ButtonProcessor.start();
 
         // START CRONS
         AutoPingCron.register();
+        ReuploadStaleEmojisCron.register();
         LogCacheStatsCron.register();
         UploadStatsCron.register();
         OldUndoFileCleanupCron.register();
+        EndOldGamesCron.register();
+        LogButtonRuntimeStatisticsCron.register();
+        TechSummaryCron.register();
+        SabotageAutoReactCron.register();
+        AgendaPhaseAutoReactCron.register();
+        FastScFollowCron.register();
 
         // BOT IS READY
         GlobalSettings.setSetting(ImplementedSettings.READY_TO_RECEIVE_COMMANDS, true);
@@ -239,15 +246,10 @@ public class AsyncTI4DiscordBot {
                 BotLogger.logWithTimestamp("SHUTDOWN PROCESS STARTED");
                 GlobalSettings.setSetting(ImplementedSettings.READY_TO_RECEIVE_COMMANDS, false);
                 BotLogger.logWithTimestamp("NO LONGER ACCEPTING COMMANDS");
-                if (shutdown()) { // will wait for up to an additional 20 seconds
+                if (ExecutorManager.shutdown()) { // will wait for up to an additional 20 seconds
                     BotLogger.logWithTimestamp("FINISHED PROCESSING ASYNC THREADPOOL");
                 } else {
                     BotLogger.logWithTimestamp("DID NOT FINISH PROCESSING ASYNC THREADPOOL");
-                }
-                if (ButtonProcessor.shutdown()) { // will wait for up to an additional 20 seconds
-                    BotLogger.logWithTimestamp("FINISHED PROCESSING BUTTONS");
-                } else {
-                    BotLogger.logWithTimestamp("DID NOT FINISH PROCESSING BUTTONS");
                 }
                 if (MapRenderPipeline.shutdown()) { // will wait for up to an additional 20 seconds
                     BotLogger.logWithTimestamp("FINISHED RENDERING MAPS");
@@ -363,31 +365,6 @@ public class AsyncTI4DiscordBot {
             .flatMap(guild -> guild.getCategories().stream())
             .filter(category -> category.getName().toUpperCase().startsWith("PBD #"))
             .toList();
-    }
-
-    public static void runAsync(String name, Runnable runnable) {
-        var timedRunnable = new TimedRunnable(name, runnable);
-        THREAD_POOL.submit(timedRunnable);
-    }
-
-    public static void runAsync(String name, int executionTimeWarningThresholdSeconds, Runnable runnable) {
-        var timedRunnable = new TimedRunnable(name, executionTimeWarningThresholdSeconds, runnable);
-        THREAD_POOL.submit(timedRunnable);
-    }
-
-    public static boolean shutdown() {
-        THREAD_POOL.shutdown();
-        try {
-            if (!THREAD_POOL.awaitTermination(20, TimeUnit.SECONDS)) {
-                THREAD_POOL.shutdownNow();
-                return false;
-            }
-        } catch (InterruptedException e) {
-            THREAD_POOL.shutdownNow();
-            Thread.currentThread().interrupt();
-            return false;
-        }
-        return true;
     }
 
     public static List<Class<?>> getAllClasses() {

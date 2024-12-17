@@ -13,9 +13,11 @@ import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import org.apache.commons.lang3.StringUtils;
 import ti4.AsyncTI4DiscordBot;
+import ti4.executors.ExecutorManager;
 import ti4.listeners.annotations.ButtonHandler;
 import ti4.map.Game;
-import ti4.map.GameManager;
+import ti4.map.manage.GameManager;
+import ti4.message.BotLogger;
 import ti4.message.MessageHelper;
 import ti4.service.game.CreateGameService;
 import ti4.settings.GlobalSettings;
@@ -26,7 +28,7 @@ class CreateGameButtonHandler {
 
     @ButtonHandler("createGameChannels")
     public static void createGameChannelsButton(ButtonInteractionEvent event) {
-        AsyncTI4DiscordBot.runAsync("Create game channels button task", () -> createGameChannels(event));
+        ExecutorManager.runAsync("Create game channels button task", () -> createGameChannels(event));
     }
 
     private static void createGameChannels(ButtonInteractionEvent event) {
@@ -50,7 +52,11 @@ class CreateGameButtonHandler {
         String gameSillyName = StringUtils.substringBetween(buttonMsg, "Game Fun Name: ", "\n");
         String gameName = CreateGameService.getNextGameName();
         String lastGame = CreateGameService.getLastGameName();
-        Game game = GameManager.getGame(lastGame);
+        if (!GameManager.isValid(lastGame)) {
+            BotLogger.log("**Unable to create new games because the last game cannot be found. Was it deleted but the roles still exist?**");
+            return;
+        }
+        Game game = GameManager.getManagedGame(lastGame).getGame();
         if (game != null && game.getCustomName().equalsIgnoreCase(gameSillyName)) {
             MessageHelper.sendMessageToChannel(event.getMessageChannel(),
                 "The custom name of the last game is the same as the one for this game, so the bot suspects a double press " +

@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import ti4.commands2.Subcommand;
+import ti4.helpers.ButtonHelper;
 import ti4.message.MessageHelper;
 
 class ListButtons extends Subcommand {
@@ -38,22 +39,19 @@ class ListButtons extends Subcommand {
             return;
         }
 
-        Message msg = Objects.requireNonNullElse(channel, threadChannel).getHistoryAround(messageId, 1).complete().getMessageById(messageId);
-
-        if (msg == null) {
-            MessageHelper.sendMessageToChannel(event.getMessageChannel(), "Could not find message");
-            return;
-        }
-
-        msg.getButtons();
-        StringBuilder sb = new StringBuilder("Button details:\n>>> ");
-        for (Button b : msg.getButtons()) {
-            sb.append(b.getId()).append(" - ");
-            if (b.getEmoji() != null) {
-                sb.append(b.getEmoji().getFormatted()).append(" ");
+        Objects.requireNonNullElse(channel, threadChannel).getHistoryAround(messageId, 1).queue(messageHistory -> {
+            Message msg = messageHistory.getMessageById(messageId);
+            if (msg == null) {
+                MessageHelper.sendMessageToChannel(event.getMessageChannel(), "Could not find message");
+                return;
             }
-            sb.append(b.getLabel()).append("\n");
-        }
-        MessageHelper.sendMessageToChannel(event.getMessageChannel(), sb.toString());
+
+            msg.getButtons();
+            StringBuilder sb = new StringBuilder("Button details:\n>>> ");
+            for (Button b : msg.getButtons()) {
+                sb.append(ButtonHelper.getButtonRepresentation(b)).append("\n");
+            }
+            MessageHelper.sendMessageToChannel(event.getMessageChannel(), sb.toString());
+        });
     }
 }
