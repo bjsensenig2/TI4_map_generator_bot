@@ -21,12 +21,6 @@
     },
     {
         "ItemCategory": "ABILITY",
-        "ItemId": "creuss_gate",
-        "Undraftable": true,
-        "source": "pok"
-    },
-    {
-        "ItemCategory": "ABILITY",
         "ItemId": "dark_whispers",
         "OptionalSwaps": [
             "PN:dark_pact",
@@ -270,14 +264,6 @@
         "ItemCategory": "HERO",
         "ItemId": "keleresheroodlynn",
         "AlwaysAddToPool": true,
-        "source": "pok"
-    },
-    {
-        "ItemCategory": "HOMESYSTEM",
-        "ItemId": "ghost",
-        "AdditionalComponents": [
-            "ABILITY:creuss_gate"
-        ],
         "source": "pok"
     },
     {
